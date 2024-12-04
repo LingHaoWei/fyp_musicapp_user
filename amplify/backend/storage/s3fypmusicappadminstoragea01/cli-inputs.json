@@ -1,0 +1,14 @@
+{
+  "resourceName": "s3fypmusicappadminstoragea01",
+  "bucketName": "fypmusicappadmin-storage-a01",
+  "policyUUID": "c58bd657",
+  "storageAccess": "authAndGuest",
+  "guestAccess": [
+    "READ"
+  ],
+  "authAccess": [
+    "CREATE_AND_UPDATE",
+    "READ",
+    "DELETE"
+  ]
+}

@@ -1,0 +1,23 @@
+type Songs @model @auth(rules: [{allow: private}]) {
+  id: ID!
+  title: String
+  artist: String
+  album: String
+  duration: Int
+  fileType: String
+  genre: String
+}
+
+type History @model @auth(rules: [{allow: private}]) {
+  id: ID!
+  songID: String
+  userID: String
+}
+
+type Users @model @auth(rules: [{allow: private}]) {
+  id: ID!
+  name: String
+  email: String
+  preferFileType: String
+}
+ 

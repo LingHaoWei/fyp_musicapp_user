@@ -1,0 +1,50 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-fypmusicappadmin-dev-2489a-authRole",
+      "UnauthRoleArn": "arn:aws:iam::390403855136:role/amplify-fypmusicappadmin-dev-2489a-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::390403855136:role/amplify-fypmusicappadmin-dev-2489a-authRole",
+      "Region": "ap-southeast-2",
+      "DeploymentBucketName": "amplify-fypmusicappadmin-dev-2489a-deployment",
+      "UnauthRoleName": "amplify-fypmusicappadmin-dev-2489a-unauthRole",
+      "StackName": "amplify-fypmusicappadmin-dev-2489a",
+      "StackId": "arn:aws:cloudformation:ap-southeast-2:390403855136:stack/amplify-fypmusicappadmin-dev-2489a/c0828730-a19a-11ef-ae7e-0644e93f845d",
+      "AmplifyAppId": "d32oh2x70frrax"
+    },
+    "categories": {
+      "auth": {
+        "fypmusicappadmin77780a6d": {}
+      },
+      "storage": {
+        "s3fypmusicappadminstoragea01": {}
+      },
+      "api": {
+        "fypmusicappadmin": {}
+      }
+    }
+  },
+  "deva": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-fypmusicappadmin-deva-2c91c-authRole",
+      "UnauthRoleArn": "arn:aws:iam::390403855136:role/amplify-fypmusicappadmin-deva-2c91c-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::390403855136:role/amplify-fypmusicappadmin-deva-2c91c-authRole",
+      "Region": "ap-southeast-2",
+      "DeploymentBucketName": "amplify-fypmusicappadmin-deva-2c91c-deployment",
+      "UnauthRoleName": "amplify-fypmusicappadmin-deva-2c91c-unauthRole",
+      "StackName": "amplify-fypmusicappadmin-deva-2c91c",
+      "StackId": "arn:aws:cloudformation:ap-southeast-2:390403855136:stack/amplify-fypmusicappadmin-deva-2c91c/ed4107f0-aafb-11ef-a558-0aa908365d1b",
+      "AmplifyAppId": "d32oh2x70frrax"
+    },
+    "categories": {
+      "auth": {
+        "fypmusicappadmin77780a6d": {}
+      },
+      "api": {
+        "fypmusicappadmin": {}
+      },
+      "storage": {
+        "s3fypmusicappadminstoragea01": {}
+      }
+    }
+  }
+}
