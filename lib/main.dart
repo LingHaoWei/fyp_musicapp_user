@@ -315,7 +315,7 @@ class CustomScaffold extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 54, bottom: 54),
                   child:
-                      Center(child: Image.asset('images/logo.png', width: 72)),
+                      Center(child: Image.asset('images/logo.png', width: 84)),
                 ),
                 Container(
                   constraints: const BoxConstraints(maxWidth: 600),

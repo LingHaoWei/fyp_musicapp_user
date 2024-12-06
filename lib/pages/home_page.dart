@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:fyp_musicapp_aws/main.dart';
 import 'package:fyp_musicapp_aws/theme/app_color.dart';
 import 'package:fyp_musicapp_aws/widgets/song_card.dart';
 import 'package:fyp_musicapp_aws/widgets/section_title.dart';
@@ -80,43 +79,34 @@ class _HomePageState extends State<HomePage> {
   // Update the _setupAudioPlayer method
   void _setupAudioPlayer() {
     _audioPlayer.playerStateStream.listen((state) {
+      if (!mounted) return;
       setState(() {
-        _isPlaying = state.playing;
+        _isPlaying =
+            state.playing && state.processingState != ProcessingState.completed;
+        safePrint(
+            'Player state changed: playing=${state.playing}, state=${state.processingState}');
       });
     });
 
     // Add these listeners
     _audioPlayer.durationStream.listen((duration) {
-      if (duration != null) {
+      if (duration != null && mounted) {
         setState(() => _duration = duration);
       }
     });
 
     _audioPlayer.positionStream.listen((position) {
-      setState(() => _position = position);
+      if (mounted) {
+        setState(() => _position = position);
+      }
     });
 
     _audioPlayer.processingStateStream.listen((state) {
-      if (state == ProcessingState.completed) {
+      if (state == ProcessingState.completed && mounted) {
+        setState(() => _isPlaying = false);
         _playNextSong();
       }
     });
-  }
-
-  Future<void> _signOut(BuildContext context) async {
-    try {
-      await Amplify.Auth.signOut();
-      if (!context.mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const MyApp()),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      debugPrint('Sign out failed: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign out failed. Please try again.')),
-      );
-    }
   }
 
   Future<List<Songs?>> queryListItems() async {
@@ -168,6 +158,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildRecentlyPlayedItem(BuildContext context, int index) {
     final screenSize = MediaQuery.of(context).size;
     final song = _recentSongs[index];
+    final album = song?.album;
 
     return GestureDetector(
       onTap: () {
@@ -182,7 +173,7 @@ class _HomePageState extends State<HomePage> {
         padding: EdgeInsets.only(right: _padding),
         child: SongCard(
           width: screenSize.width * 0.3,
-          imageUrl: 'images/logo.png',
+          imageUrl: 'images/${album ?? 'logo'}.png',
           songName: song?.title ?? 'Untitled',
           artistName: song?.artist ?? 'Unknown Artist',
         ),
@@ -230,17 +221,18 @@ class _HomePageState extends State<HomePage> {
   // Simplified audio control methods
   Future<void> _playSong(Songs song) async {
     try {
-      // If same song, just toggle play/pause
       if (_currentSong?.id == song.id) {
         if (_audioPlayer.playing) {
           await _audioPlayer.pause();
+          setState(() => _isPlaying = false);
         } else {
           await _audioPlayer.play();
+          setState(() => _isPlaying = true);
         }
         return;
       }
 
-      // New song, load and play
+      setState(() => _isPlaying = true); // Set playing state before loading
       _currentSong = song;
       await _audioPlayer.stop();
 
@@ -251,10 +243,50 @@ class _HomePageState extends State<HomePage> {
       ).result;
 
       await _audioPlayer.setUrl(result.url.toString());
+      await _storeHistory(song);
       await _audioPlayer.play();
-      setState(() => _isPlaying = true);
     } catch (e) {
       safePrint('Error playing song: $e');
+      setState(() => _isPlaying = false); // Reset state on error
+    }
+  }
+
+  Future<void> _storeHistory(Songs song) async {
+    try {
+      // Get current user
+      final user = await Amplify.Auth.getCurrentUser();
+      safePrint('Current user ID: ${user.userId}');
+
+      // Check if history entry already exists
+      final existingHistoryRequest = ModelQueries.list(
+        History.classType,
+        where: History.USERID.eq(user.userId).and(History.SONGID.eq(song.id)),
+      );
+      final existingHistoryResponse =
+          await Amplify.API.query(request: existingHistoryRequest).response;
+
+      if (existingHistoryResponse.data?.items.isNotEmpty ?? false) {
+        // Update existing history entry
+        final existingHistory = existingHistoryResponse.data!.items.first!;
+        final updateRequest = ModelMutations.update(existingHistory);
+        await Amplify.API.mutate(request: updateRequest).response;
+        safePrint('History entry updated for song: ${song.id}');
+        return;
+      }
+
+      // Create new history entry if it doesn't exist
+      final history = History(
+        userID: user.userId,
+        songID: song.id,
+      );
+
+      // Save to database
+      final request = ModelMutations.create(history);
+      await Amplify.API.mutate(request: request).response;
+
+      safePrint('New history entry stored successfully');
+    } catch (e) {
+      safePrint('Error storing/updating history: $e');
     }
   }
 
@@ -289,18 +321,19 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _togglePlayPause(Songs song) async {
     try {
+      setState(() => _isPlaying = !_isPlaying); // Update state immediately
       if (_isPlaying) {
-        await _audioPlayer.pause();
-      } else {
         if (_audioPlayer.audioSource == null) {
           await _playSong(song);
         } else {
           await _audioPlayer.play();
         }
+      } else {
+        await _audioPlayer.pause();
       }
-      setState(() => _isPlaying = !_isPlaying);
     } catch (e) {
       safePrint('Error toggling playback: $e');
+      setState(() => _isPlaying = _audioPlayer.playing); // Revert on error
     }
   }
 
@@ -325,7 +358,7 @@ class _HomePageState extends State<HomePage> {
                   style: const TextStyle(fontSize: 14),
                 ),
                 IconButton(
-                  onPressed: () => _signOut(context),
+                  onPressed: () => {},
                   icon: const Icon(Icons.person),
                 ),
               ],
@@ -357,7 +390,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         // Trending Now Section
                         SizedBox(height: _padding * 2),
-                        const SectionTitle(title: 'Trending Now'),
+                        const SectionTitle(title: 'Playlists'),
                         SizedBox(height: _padding),
                         ListView.builder(
                           shrinkWrap: true,

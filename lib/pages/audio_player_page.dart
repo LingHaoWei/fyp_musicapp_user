@@ -38,6 +38,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   final DraggableScrollableController _dragController =
       DraggableScrollableController();
   bool _isSheetAttached = false;
+  late Songs _currentSong;
 
   // Add throttling for position updates
   static const _positionUpdateInterval = Duration(milliseconds: 500);
@@ -46,6 +47,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   @override
   void initState() {
     super.initState();
+    _currentSong = widget.song;
     _isPlaying = widget.isPlaying;
     _setupPlayerListeners();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -53,8 +55,34 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     });
   }
 
+  @override
+  void didUpdateWidget(AudioPlayerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.song.id != oldWidget.song.id) {
+      setState(() {
+        _currentSong = widget.song;
+        _isPlaying = widget.isPlaying;
+        _duration = widget.duration;
+        _position = widget.position;
+      });
+    } else {
+      setState(() {
+        _isPlaying = widget.isPlaying;
+      });
+    }
+  }
+
   void _setupPlayerListeners() {
-    // Throttle position updates
+    widget.audioPlayer.playerStateStream.listen((playerState) {
+      if (!mounted) return;
+      setState(() {
+        _isPlaying = playerState.playing;
+        _isLoading = playerState.processingState == ProcessingState.loading ||
+            playerState.processingState == ProcessingState.buffering;
+        widget.onPlayStateChanged(_isPlaying);
+      });
+    });
+
     widget.audioPlayer.positionStream
         .throttleTime(_positionUpdateInterval)
         .listen((position) {
@@ -62,21 +90,9 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
       setState(() => _position = position);
     });
 
-    // Only update duration once
-    widget.audioPlayer.durationStream.first.then((duration) {
-      if (!mounted) return;
+    widget.audioPlayer.durationStream.listen((duration) {
+      if (!mounted || duration == null) return;
       setState(() => _duration = duration);
-    });
-
-    // Optimize state updates
-    widget.audioPlayer.playerStateStream.listen((playerState) {
-      if (!mounted) return;
-      setState(() {
-        _isPlaying = playerState.playing;
-        widget.onPlayStateChanged(playerState.playing);
-        _isLoading = playerState.processingState == ProcessingState.loading ||
-            playerState.processingState == ProcessingState.buffering;
-      });
     });
   }
 
@@ -137,6 +153,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   }
 
   Widget _buildMiniPlayer() {
+    final album = _currentSong.album;
     return Container(
       height: 60,
       color: const Color(0xFF151515),
@@ -149,8 +166,8 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(6),
-              image: const DecorationImage(
-                image: AssetImage('images/logo.png'),
+              image: DecorationImage(
+                image: AssetImage('images/${album ?? 'logo'}.png'),
                 fit: BoxFit.cover,
               ),
             ),
@@ -162,7 +179,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.song.title ?? 'Unknown Title',
+                  _currentSong.title ?? 'Unknown Title',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -171,7 +188,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  widget.song.artist ?? 'Unknown Artist',
+                  _currentSong.artist ?? 'Unknown Artist',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[400],
@@ -233,13 +250,14 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   }
 
   Widget _buildAlbumArt() {
+    final album = _currentSong.album;
     return Container(
       width: 250,
       height: 250,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        image: const DecorationImage(
-          image: AssetImage('images/logo.png'),
+        image: DecorationImage(
+          image: AssetImage('images/${album ?? 'logo'}.png'),
           fit: BoxFit.cover,
         ),
         boxShadow: [
@@ -259,13 +277,13 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
       child: Column(
         children: [
           Text(
-            widget.song.title ?? 'Unknown Title',
+            _currentSong.title ?? 'Unknown Title',
             style: Theme.of(context).textTheme.headlineSmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            widget.song.artist ?? 'Unknown Artist',
+            _currentSong.artist ?? 'Unknown Artist',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.grey[400],
                 ),
@@ -314,6 +332,18 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton(
+          iconSize: 40,
+          icon: const Icon(Icons.skip_previous),
+          onPressed: () {
+            widget.onPreviousSong();
+            setState(() {
+              _currentSong = widget.song;
+              _isPlaying = widget.isPlaying;
+            });
+          },
+        ),
+        const SizedBox(width: 20),
+        IconButton(
           iconSize: 64,
           icon: Icon(
             _isLoading
@@ -331,6 +361,18 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                     await widget.audioPlayer.play();
                   }
                 },
+        ),
+        const SizedBox(width: 20),
+        IconButton(
+          iconSize: 40,
+          icon: const Icon(Icons.skip_next),
+          onPressed: () {
+            widget.onNextSong();
+            setState(() {
+              _currentSong = widget.song;
+              _isPlaying = widget.isPlaying;
+            });
+          },
         ),
       ],
     );

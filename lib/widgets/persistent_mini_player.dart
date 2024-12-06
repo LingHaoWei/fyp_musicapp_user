@@ -18,7 +18,7 @@ class PersistentMiniPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (currentSong == null) return const SizedBox.shrink();
-
+    final album = currentSong?.album;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -41,8 +41,8 @@ class PersistentMiniPlayer extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                image: const DecorationImage(
-                  image: AssetImage('images/logo.png'),
+                image: DecorationImage(
+                  image: AssetImage('images/${album ?? 'logo'}.png'),
                   fit: BoxFit.cover,
                 ),
               ),
