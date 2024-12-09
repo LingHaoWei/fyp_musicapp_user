@@ -11,6 +11,8 @@ import 'package:amplify_api/amplify_api.dart';
 import 'package:fyp_musicapp_aws/pages/audio_player_page.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:fyp_musicapp_aws/widgets/persistent_mini_player.dart';
+import 'playlist_page.dart';
+import 'playlist_details_page.dart';
 
 // Add this before the HomePage class
 class LifecycleEventHandler extends WidgetsBindingObserver {
@@ -59,6 +61,9 @@ class _HomePageState extends State<HomePage> {
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
 
+  // Add this property
+  final List<Playlists?> _userPlaylists = [];
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -73,6 +78,7 @@ class _HomePageState extends State<HomePage> {
     _checkAmplifyConfig();
     _fetchRecentSongs();
     _fetchUserProfile();
+    _fetchUserPlaylists();
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
   }
 
@@ -169,14 +175,46 @@ class _HomePageState extends State<HomePage> {
           _showAudioPlayer(song);
         }
       },
-      child: Padding(
-        padding: EdgeInsets.only(right: _padding),
-        child: SongCard(
-          width: screenSize.width * 0.3,
-          imageUrl: 'images/${album ?? 'logo'}.png',
-          songName: song?.title ?? 'Untitled',
-          artistName: song?.artist ?? 'Unknown Artist',
-        ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(right: _padding),
+            child: SongCard(
+              width: screenSize.width * 0.28,
+              imageUrl: 'images/${album ?? 'logo'}.png',
+              songName: song?.title ?? 'Untitled',
+              artistName: song?.artist ?? 'Unknown Artist',
+            ),
+          ),
+          Positioned(
+            top: 0,
+            right: _padding,
+            child: IconButton(
+              icon: const Icon(Icons.more_vert),
+              onPressed: () {
+                if (song != null) {
+                  showModalBottomSheet(
+                    context: context,
+                    backgroundColor: const Color(0xFF151515),
+                    builder: (context) => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.playlist_add),
+                          title: const Text('Add to Playlist'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showAddToPlaylistModal(song);
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -337,6 +375,263 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _addSongToPlaylist(Songs song, Playlists playlist) async {
+    try {
+      final playlistItem = PlaylistItems(
+        PlaylistID: playlist.id,
+        SongID: song.id,
+      );
+
+      final request = ModelMutations.create(playlistItem);
+      await Amplify.API.mutate(request: request).response;
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Added to ${playlist.name}')),
+      );
+    } catch (e) {
+      safePrint('Error adding song to playlist: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error adding to playlist')),
+      );
+    }
+  }
+
+  Future<void> _fetchUserPlaylists() async {
+    try {
+      final user = await Amplify.Auth.getCurrentUser();
+      final request = ModelQueries.list(
+        Playlists.classType,
+        where: Playlists.USERID.eq(user.userId),
+      );
+
+      final response = await Amplify.API.query(request: request).response;
+      final items = response.data?.items;
+
+      if (mounted) {
+        setState(() {
+          _userPlaylists.clear(); // Clear existing playlists
+          _userPlaylists
+              .addAll(items?.whereType<Playlists>() ?? []); // Add new playlists
+        });
+      }
+    } catch (e) {
+      safePrint('Error fetching playlists: $e');
+    }
+  }
+
+  void _showAddToPlaylistModal(Songs song) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF151515),
+      builder: (context) {
+        if (_userPlaylists.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('No playlists found. Create a playlist first.'),
+          );
+        }
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Add to Playlist',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _userPlaylists.length,
+                itemBuilder: (context, index) {
+                  final playlist = _userPlaylists[index];
+                  if (playlist == null) return const SizedBox.shrink();
+                  return ListTile(
+                    leading: const Icon(Icons.playlist_add),
+                    title: Text(playlist.name ?? 'Untitled Playlist'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _addSongToPlaylist(song, playlist);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _renamePlaylist(Playlists playlist) async {
+    final TextEditingController nameController =
+        TextEditingController(text: playlist.name);
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF202020),
+        title: const Text('Rename Playlist'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Enter new name',
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xffa91d3a)),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xffa91d3a)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isNotEmpty) {
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                try {
+                  final updatedPlaylist = playlist.copyWith(name: newName);
+                  final request = ModelMutations.update(updatedPlaylist);
+                  await Amplify.API.mutate(request: request).response;
+
+                  _fetchUserPlaylists(); // Refresh the playlists
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                          content: Text('Playlist renamed successfully')),
+                    );
+                  }
+                } catch (e) {
+                  safePrint('Error renaming playlist: $e');
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(content: Text('Error renaming playlist')),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePlaylist(Playlists playlist) async {
+    final bool confirm = await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: const Color(0xFF202020),
+            title: const Text('Delete Playlist'),
+            content:
+                Text('Are you sure you want to delete "${playlist.name}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xffa91d3a),
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (confirm && mounted) {
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      try {
+        // First, delete all playlist items
+        final playlistItemsRequest = ModelQueries.list(
+          PlaylistItems.classType,
+          where: PlaylistItems.PLAYLISTID.eq(playlist.id),
+        );
+        final playlistItemsResponse =
+            await Amplify.API.query(request: playlistItemsRequest).response;
+
+        for (final item in playlistItemsResponse.data?.items ?? []) {
+          if (item != null) {
+            final deleteItemRequest =
+                ModelMutations.delete<PlaylistItems>(item);
+            await Amplify.API.mutate(request: deleteItemRequest).response;
+          }
+        }
+
+        // Then delete the playlist
+        final deleteRequest = ModelMutations.delete(playlist);
+        await Amplify.API.mutate(request: deleteRequest).response;
+
+        _fetchUserPlaylists(); // Refresh the playlists
+
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(content: Text('Playlist deleted successfully')),
+          );
+        }
+      } catch (e) {
+        safePrint('Error deleting playlist: $e');
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(content: Text('Error deleting playlist')),
+          );
+        }
+      }
+    }
+  }
+
+  void _showPlaylistOptions(Playlists playlist) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF202020),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Rename Playlist'),
+              onTap: () {
+                Navigator.pop(context);
+                _renamePlaylist(playlist);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Color(0xffa91d3a)),
+              title: const Text('Delete Playlist',
+                  style: TextStyle(
+                      color: Color(0xffa91d3a), fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(context);
+                _deletePlaylist(playlist);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -378,6 +673,7 @@ class _HomePageState extends State<HomePage> {
                     padding: EdgeInsets.all(_padding),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
+                        // Recently Added Section
                         const SectionTitle(title: 'Recently Added'),
                         SizedBox(height: _padding),
                         SizedBox(
@@ -388,47 +684,144 @@ class _HomePageState extends State<HomePage> {
                             itemBuilder: _buildRecentlyPlayedItem,
                           ),
                         ),
-                        // Trending Now Section
+
+                        // Playlists Section
                         SizedBox(height: _padding * 2),
-                        const SectionTitle(title: 'Playlists'),
-                        SizedBox(height: _padding),
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _recentSongs.length,
-                          itemBuilder: (context, index) {
-                            final song = _recentSongs[index];
-                            return ListTile(
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: _padding * 0.5,
-                                horizontal: 0,
-                              ),
-                              leading: Container(
-                                width: screenSize.width * 0.10,
-                                height: screenSize.width * 0.10,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(6),
-                                  image: const DecorationImage(
-                                    image: AssetImage('images/logo.png'),
-                                    fit: BoxFit.cover,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const SectionTitle(title: 'Playlists'),
+                            TextButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const PlaylistPage(),
                                   ),
+                                );
+                              },
+                              label: const Text(
+                                'Show All',
+                                style: TextStyle(color: Color(0xfffdfdfd)),
+                              ),
+                              style: TextButton.styleFrom(
+                                backgroundColor: const Color(0xFF202020),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              title: Text(
-                                song?.title ?? 'Untitled',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                song?.artist ?? 'Unknown Artist',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.more_vert),
-                                onPressed: () {},
-                              ),
-                            );
-                          },
+                            ),
+                          ],
                         ),
+                        SizedBox(height: _padding),
+                        _userPlaylists.isEmpty
+                            ? Container(
+                                height: 160,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF151515),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.queue_music,
+                                      size: 48,
+                                      color: Color(0xffa91d3a),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'Create Your First Playlist',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Organize your favorite songs',
+                                      style: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const PlaylistPage(),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Create Playlist'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xffa91d3a),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _userPlaylists.length,
+                                itemBuilder: (context, index) {
+                                  final playlist = _userPlaylists[index];
+                                  if (playlist == null) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  return Card(
+                                    color: const Color(0xFF151515),
+                                    child: ListTile(
+                                      contentPadding: const EdgeInsets.all(12),
+                                      leading: Container(
+                                        width: 56,
+                                        height: 56,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF303030),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(
+                                          Icons.queue_music,
+                                          size: 32,
+                                          color: Color(0xff909090),
+                                        ),
+                                      ),
+                                      title: Text(
+                                        playlist.name ?? 'Untitled Playlist',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.more_vert),
+                                        onPressed: () =>
+                                            _showPlaylistOptions(playlist),
+                                      ),
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                PlaylistDetailsPage(
+                                                    playlist: playlist),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
                       ]),
                     ),
                   ),

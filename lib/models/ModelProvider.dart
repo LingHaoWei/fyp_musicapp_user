@@ -21,18 +21,22 @@
 
 import 'package:amplify_core/amplify_core.dart' as amplify_core;
 import 'History.dart';
+import 'PlaylistItems.dart';
+import 'Playlists.dart';
 import 'Songs.dart';
 import 'Users.dart';
 
 export 'History.dart';
+export 'PlaylistItems.dart';
+export 'Playlists.dart';
 export 'Songs.dart';
 export 'Users.dart';
 
 class ModelProvider implements amplify_core.ModelProviderInterface {
   @override
-  String version = "68255fe8824e97371537ce11d1b5abe4";
+  String version = "f29b363e939d9f8f4d54d822c7a8799a";
   @override
-  List<amplify_core.ModelSchema> modelSchemas = [History.schema, Songs.schema, Users.schema];
+  List<amplify_core.ModelSchema> modelSchemas = [History.schema, PlaylistItems.schema, Playlists.schema, Songs.schema, Users.schema];
   @override
   List<amplify_core.ModelSchema> customTypeSchemas = [];
   static final ModelProvider _instance = ModelProvider();
@@ -43,6 +47,10 @@ class ModelProvider implements amplify_core.ModelProviderInterface {
     switch(modelName) {
       case "History":
         return History.classType;
+      case "PlaylistItems":
+        return PlaylistItems.classType;
+      case "Playlists":
+        return Playlists.classType;
       case "Songs":
         return Songs.classType;
       case "Users":

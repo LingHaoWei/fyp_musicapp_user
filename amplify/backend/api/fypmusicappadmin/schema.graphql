@@ -1,3 +1,15 @@
+type PlaylistItems @model @auth(rules: [{allow: private}]) {
+  id: ID!
+  PlaylistID: String
+  SongID: String
+}
+
+type Playlists @model @auth(rules: [{allow: private}]) {
+  id: ID!
+  userID: String
+  name: String
+}
+
 type Songs @model @auth(rules: [{allow: private}]) {
   id: ID!
   title: String

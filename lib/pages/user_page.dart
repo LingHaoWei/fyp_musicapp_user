@@ -5,6 +5,7 @@ import '../models/Users.dart';
 import 'settings_page.dart';
 import '../main.dart';
 import 'history_page.dart';
+import 'playlist_page.dart';
 
 class UserPage extends StatefulWidget {
   const UserPage({super.key});
@@ -74,7 +75,12 @@ class _UserPageState extends State<UserPage> {
             title: const Text('My Playlists'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
-              // Navigate to playlists
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PlaylistPage(),
+                ),
+              );
             },
           ),
           const Divider(),
