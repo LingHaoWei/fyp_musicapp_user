@@ -1,27 +1,26 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fyp_musicapp_aws/models/ModelProvider.dart';
+import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:rxdart/rxdart.dart';
 
 class AudioPlayerPage extends StatefulWidget {
   final Songs song;
-  final AudioPlayer audioPlayer;
-  final Function(bool) onPlayStateChanged;
+  final AudioHandler audioHandler;
   final bool isPlaying;
   final Duration duration;
   final Duration position;
+  final Function(bool) onPlayStateChanged;
   final VoidCallback onPreviousSong;
   final VoidCallback onNextSong;
 
   const AudioPlayerPage({
     super.key,
     required this.song,
-    required this.audioPlayer,
-    required this.onPlayStateChanged,
+    required this.audioHandler,
     required this.isPlaying,
     required this.duration,
     required this.position,
+    required this.onPlayStateChanged,
     required this.onPreviousSong,
     required this.onNextSong,
   });
@@ -40,10 +39,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   bool _isSheetAttached = false;
   late Songs _currentSong;
 
-  // Add throttling for position updates
-  static const _positionUpdateInterval = Duration(milliseconds: 500);
-  Timer? _positionUpdateTimer;
-
   @override
   void initState() {
     super.initState();
@@ -55,52 +50,45 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     });
   }
 
-  @override
-  void didUpdateWidget(AudioPlayerPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.song.id != oldWidget.song.id) {
-      setState(() {
-        _currentSong = widget.song;
-        _isPlaying = widget.isPlaying;
-        _duration = widget.duration;
-        _position = widget.position;
-      });
-    } else {
-      setState(() {
-        _isPlaying = widget.isPlaying;
-      });
-    }
-  }
-
   void _setupPlayerListeners() {
-    widget.audioPlayer.playerStateStream.listen((playerState) {
-      if (!mounted) return;
-      setState(() {
-        _isPlaying = playerState.playing;
-        _isLoading = playerState.processingState == ProcessingState.loading ||
-            playerState.processingState == ProcessingState.buffering;
-        widget.onPlayStateChanged(_isPlaying);
-      });
+    widget.audioHandler.playbackState.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state.playing;
+          _isLoading = state.processingState == ProcessingState.loading;
+        });
+      }
     });
 
-    widget.audioPlayer.positionStream
-        .throttleTime(_positionUpdateInterval)
-        .listen((position) {
-      if (!mounted) return;
-      setState(() => _position = position);
+    widget.audioHandler.durationStream.listen((duration) {
+      if (mounted && duration != null) {
+        setState(() => _duration = duration);
+      }
     });
 
-    widget.audioPlayer.durationStream.listen((duration) {
-      if (!mounted || duration == null) return;
-      setState(() => _duration = duration);
+    widget.audioHandler.positionStream.listen((position) {
+      if (mounted) {
+        setState(() => _position = position);
+      }
+    });
+
+    widget.audioHandler.currentSongStream.listen((song) {
+      if (mounted && song != null) {
+        setState(() => _currentSong = song);
+      }
     });
   }
 
-  @override
-  void dispose() {
-    _positionUpdateTimer?.cancel();
-    _dragController.dispose();
-    super.dispose();
+  void _seekTo(Duration position) {
+    widget.audioHandler.seekTo(position);
+  }
+
+  void _onPlayPause() async {
+    if (_isPlaying) {
+      await widget.audioHandler.pause();
+    } else {
+      await widget.audioHandler.play();
+    }
   }
 
   @override
@@ -208,13 +196,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                   _isPlaying ? Icons.pause : Icons.play_arrow,
                   color: Colors.white,
                 ),
-                onPressed: () {
-                  if (_isPlaying) {
-                    widget.audioPlayer.pause();
-                  } else {
-                    widget.audioPlayer.play();
-                  }
-                },
+                onPressed: _onPlayPause,
               ),
               IconButton(
                 icon: const Icon(
@@ -308,7 +290,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
               max: (_duration?.inSeconds ?? 0).toDouble(),
               onChanged: (value) async {
                 final position = Duration(seconds: value.toInt());
-                await widget.audioPlayer.seek(position);
+                _seekTo(position);
               },
             ),
           ),
@@ -344,23 +326,16 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
         ),
         const SizedBox(width: 20),
         IconButton(
-          iconSize: 64,
+          iconSize: 72,
           icon: Icon(
             _isLoading
                 ? Icons.hourglass_empty
                 : (_isPlaying
                     ? Icons.pause_circle_filled
                     : Icons.play_circle_filled),
+            color: Colors.white,
           ),
-          onPressed: _isLoading
-              ? null
-              : () async {
-                  if (_isPlaying) {
-                    await widget.audioPlayer.pause();
-                  } else {
-                    await widget.audioPlayer.play();
-                  }
-                },
+          onPressed: _isLoading ? null : _onPlayPause,
         ),
         const SizedBox(width: 20),
         IconButton(

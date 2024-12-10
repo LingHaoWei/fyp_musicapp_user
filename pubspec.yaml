@@ -33,14 +33,17 @@ dependencies:
   cupertino_icons: ^1.0.8
   amplify_flutter: ^2.5.0
   amplify_auth_cognito: ^2.5.0
-  amplify_authenticator: ^2.3.0
   amplify_api: ^2.5.0
-  go_router: ^14.6.1
   amplify_storage_s3: ^2.5.0
+  amplify_authenticator: ^2.3.0
+  go_router: ^14.6.1
   cached_network_image: ^3.4.0
   amplify_datastore: ^2.5.0
-  just_audio: ^0.9.42
+  just_audio: ^0.9.36
   rxdart: ^0.28.0
+  audio_service: ^0.18.12
+  provider: ^6.1.1
+  speech_to_text: ^6.4.1
 
 dev_dependencies:
   flutter_test:

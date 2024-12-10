@@ -154,8 +154,9 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const MaterialApp(
-        home: Scaffold(
+      return MaterialApp(
+        theme: _buildAppTheme(),
+        home: const Scaffold(
           body: Center(
             child: CircularProgressIndicator(),
           ),

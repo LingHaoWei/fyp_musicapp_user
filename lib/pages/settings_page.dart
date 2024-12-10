@@ -145,7 +145,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               Card(
-                color: const Color(0xFF202020),
+                color: const Color(0xFF151515),
                 child: ListTile(
                   title: const Text(
                     'Username',
@@ -155,7 +155,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF303030),
+                      color: const Color(0xFF202020),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.person, color: Color(0xFFFDFDFD)),
@@ -176,14 +176,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               Card(
-                color: const Color(0xFF202020),
+                color: const Color(0xFF151515),
                 child: ListTile(
                   title: const Text('Preferred File Type'),
                   subtitle: Text(_preferFileType.toUpperCase()),
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF303030),
+                      color: const Color(0xFF202020),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child:

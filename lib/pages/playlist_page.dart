@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:fyp_musicapp_aws/services/audio_handler.dart';
+import 'package:fyp_musicapp_aws/models/ModelProvider.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_api/amplify_api.dart';
-import '../models/ModelProvider.dart';
 import 'playlist_details_page.dart';
 
 class PlaylistPage extends StatefulWidget {
-  const PlaylistPage({super.key});
+  final AudioHandler audioHandler;
+
+  const PlaylistPage({
+    super.key,
+    required this.audioHandler,
+  });
 
   @override
   State<PlaylistPage> createState() => _PlaylistPageState();
@@ -215,8 +221,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  PlaylistDetailsPage(playlist: playlist),
+                              builder: (context) => PlaylistDetailsPage(
+                                playlist: playlist,
+                                audioHandler: widget.audioHandler,
+                              ),
                             ),
                           );
                         },

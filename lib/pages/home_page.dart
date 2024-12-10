@@ -11,24 +11,10 @@ import 'package:amplify_api/amplify_api.dart';
 import 'package:fyp_musicapp_aws/pages/audio_player_page.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:fyp_musicapp_aws/widgets/persistent_mini_player.dart';
+import 'package:fyp_musicapp_aws/services/audio_handler.dart';
+import 'package:fyp_musicapp_aws/services/lifecycle_handler.dart';
 import 'playlist_page.dart';
 import 'playlist_details_page.dart';
-
-// Add this before the HomePage class
-class LifecycleEventHandler extends WidgetsBindingObserver {
-  final AudioPlayer audioPlayer;
-
-  LifecycleEventHandler(this.audioPlayer);
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached ||
-        state == AppLifecycleState.inactive) {
-      audioPlayer.stop();
-    }
-  }
-}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -39,23 +25,17 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
-
-  // Cache MediaQuery values
   late final double _padding;
-
   List<Songs?> _recentSongs = [];
-
   String _userName = 'User';
-
   Songs? _currentSong;
   bool _isPlaying = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
-
-  // Update the observer initialization
+  late final AudioHandler _audioHandler;
   late final LifecycleEventHandler _lifecycleObserver;
 
   // Add these properties at the top of the class
-  String _preferFileType = ''; // Default value
+  String _preferFileType = 'mp3'; // Default value
 
   // Add these properties
   Duration _duration = Duration.zero;
@@ -74,6 +54,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _lifecycleObserver = LifecycleEventHandler(_audioPlayer);
+    _audioHandler = AudioHandler(_audioPlayer);
     _setupAudioPlayer();
     _checkAmplifyConfig();
     _fetchRecentSongs();
@@ -82,35 +63,35 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
   }
 
-  // Update the _setupAudioPlayer method
   void _setupAudioPlayer() {
-    _audioPlayer.playerStateStream.listen((state) {
+    _audioHandler.playbackState.listen((state) {
       if (!mounted) return;
       setState(() {
-        _isPlaying =
-            state.playing && state.processingState != ProcessingState.completed;
-        safePrint(
-            'Player state changed: playing=${state.playing}, state=${state.processingState}');
+        _isPlaying = state.playing;
       });
     });
 
-    // Add these listeners
-    _audioPlayer.durationStream.listen((duration) {
+    _audioHandler.durationStream.listen((duration) {
       if (duration != null && mounted) {
         setState(() => _duration = duration);
       }
     });
 
-    _audioPlayer.positionStream.listen((position) {
+    _audioHandler.positionStream.listen((position) {
       if (mounted) {
         setState(() => _position = position);
       }
     });
 
-    _audioPlayer.processingStateStream.listen((state) {
-      if (state == ProcessingState.completed && mounted) {
-        setState(() => _isPlaying = false);
-        _playNextSong();
+    _audioHandler.currentSongStream.listen((song) {
+      if (mounted) {
+        setState(() => _currentSong = song);
+      }
+    });
+
+    _audioHandler.playingStream.listen((playing) {
+      if (mounted) {
+        setState(() => _isPlaying = playing);
       }
     });
   }
@@ -161,7 +142,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget _buildRecentlyPlayedItem(BuildContext context, int index) {
+  Widget _buildRecentlyPlayedItemCard(BuildContext context, int index) {
     final screenSize = MediaQuery.of(context).size;
     final song = _recentSongs[index];
     final album = song?.album;
@@ -180,14 +161,14 @@ class _HomePageState extends State<HomePage> {
           Padding(
             padding: EdgeInsets.only(right: _padding),
             child: SongCard(
-              width: screenSize.width * 0.28,
+              width: screenSize.width * 0.3,
               imageUrl: 'images/${album ?? 'logo'}.png',
               songName: song?.title ?? 'Untitled',
               artistName: song?.artist ?? 'Unknown Artist',
             ),
           ),
           Positioned(
-            top: 0,
+            bottom: 0,
             right: _padding,
             child: IconButton(
               icon: const Icon(Icons.more_vert),
@@ -375,29 +356,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _addSongToPlaylist(Songs song, Playlists playlist) async {
-    try {
-      final playlistItem = PlaylistItems(
-        PlaylistID: playlist.id,
-        SongID: song.id,
-      );
-
-      final request = ModelMutations.create(playlistItem);
-      await Amplify.API.mutate(request: request).response;
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Added to ${playlist.name}')),
-      );
-    } catch (e) {
-      safePrint('Error adding song to playlist: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error adding to playlist')),
-      );
-    }
-  }
-
   Future<void> _fetchUserPlaylists() async {
     try {
       final user = await Amplify.Auth.getCurrentUser();
@@ -421,19 +379,26 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _showAddToPlaylistModal(Songs song) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF151515),
-      builder: (context) {
-        if (_userPlaylists.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('No playlists found. Create a playlist first.'),
-          );
-        }
+  Future<void> _showAddToPlaylistModal(Songs song) async {
+    try {
+      final user = await Amplify.Auth.getCurrentUser();
 
-        return Column(
+      // Get user's playlists
+      final playlistRequest = ModelQueries.list(
+        Playlists.classType,
+        where: Playlists.USERID.eq(user.userId),
+      );
+      final playlistResponse =
+          await Amplify.API.query(request: playlistRequest).response;
+      final playlists =
+          playlistResponse.data?.items.whereType<Playlists>().toList() ?? [];
+
+      if (!mounted) return;
+
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: const Color(0xFF151515),
+        builder: (context) => Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Padding(
@@ -446,28 +411,83 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            Expanded(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _userPlaylists.length,
-                itemBuilder: (context, index) {
-                  final playlist = _userPlaylists[index];
-                  if (playlist == null) return const SizedBox.shrink();
-                  return ListTile(
-                    leading: const Icon(Icons.playlist_add),
-                    title: Text(playlist.name ?? 'Untitled Playlist'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _addSongToPlaylist(song, playlist);
-                    },
-                  );
-                },
+            if (playlists.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('No playlists found. Create a playlist first.'),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: playlists.length,
+                  itemBuilder: (context, index) {
+                    final playlist = playlists[index];
+                    return ListTile(
+                      title: Text(playlist.name ?? 'Untitled Playlist'),
+                      onTap: () async {
+                        try {
+                          // Check for duplicate songs
+                          final existingSongsRequest = ModelQueries.list(
+                            PlaylistItems.classType,
+                            where: PlaylistItems.PLAYLISTID.eq(playlist.id),
+                          );
+                          final existingSongsResponse = await Amplify.API
+                              .query(request: existingSongsRequest)
+                              .response;
+                          final existingSongs = existingSongsResponse
+                                  .data?.items
+                                  .whereType<PlaylistItems>()
+                                  .toList() ??
+                              [];
+
+                          // Check if song already exists in playlist
+                          final isDuplicate = existingSongs
+                              .any((item) => item.SongID == song.id);
+
+                          if (isDuplicate) {
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Song already exists in this playlist')),
+                            );
+                            return;
+                          }
+
+                          // Add song if not a duplicate
+                          final playlistSong = PlaylistItems(
+                            PlaylistID: playlist.id,
+                            SongID: song.id,
+                          );
+                          final request = ModelMutations.create(playlistSong);
+                          await Amplify.API.mutate(request: request).response;
+
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Added to ${playlist.name}')),
+                          );
+                        } catch (e) {
+                          safePrint('Error adding song to playlist: $e');
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Failed to add to playlist')),
+                          );
+                        }
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
           ],
-        );
-      },
-    );
+        ),
+      );
+    } catch (e) {
+      safePrint('Error loading playlists: $e');
+    }
   }
 
   Future<void> _renamePlaylist(Playlists playlist) async {
@@ -488,14 +508,15 @@ class _HomePageState extends State<HomePage> {
               borderSide: BorderSide(color: Color(0xffa91d3a)),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xffa91d3a)),
+              borderSide: BorderSide(color: Color(0xffFDFDFD)),
             ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xffFDFDFD))),
           ),
           TextButton(
             onPressed: () async {
@@ -524,7 +545,10 @@ class _HomePageState extends State<HomePage> {
                 }
               }
             },
-            child: const Text('Rename'),
+            child: const Text(
+              'Rename',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -644,7 +668,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             Image.asset(
               'images/logo.png',
-              width: screenSize.width * 0.09, // 10% of screen width
+              width: screenSize.width * 0.08,
             ),
             Row(
               children: [
@@ -667,7 +691,6 @@ class _HomePageState extends State<HomePage> {
             index: _currentIndex,
             children: [
               CustomScrollView(
-                // Replace SingleChildScrollView with CustomScrollView
                 slivers: [
                   SliverPadding(
                     padding: EdgeInsets.all(_padding),
@@ -681,7 +704,7 @@ class _HomePageState extends State<HomePage> {
                           child: ListView.builder(
                             itemCount: _recentSongs.length,
                             scrollDirection: Axis.horizontal,
-                            itemBuilder: _buildRecentlyPlayedItem,
+                            itemBuilder: _buildRecentlyPlayedItemCard,
                           ),
                         ),
 
@@ -696,7 +719,9 @@ class _HomePageState extends State<HomePage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const PlaylistPage(),
+                                    builder: (context) => PlaylistPage(
+                                      audioHandler: _audioHandler,
+                                    ),
                                   ),
                                 );
                               },
@@ -753,17 +778,18 @@ class _HomePageState extends State<HomePage> {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) =>
-                                                const PlaylistPage(),
+                                            builder: (context) => PlaylistPage(
+                                                audioHandler: _audioHandler),
                                           ),
                                         );
                                       },
                                       icon: const Icon(Icons.add),
-                                      label: const Text('Create Playlist'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            const Color(0xffa91d3a),
+                                      label: const Text(
+                                        'Create Playlist',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
                                       ),
+                                      style: ElevatedButton.styleFrom(),
                                     ),
                                   ],
                                 ),
@@ -814,7 +840,9 @@ class _HomePageState extends State<HomePage> {
                                           MaterialPageRoute(
                                             builder: (context) =>
                                                 PlaylistDetailsPage(
-                                                    playlist: playlist),
+                                                    playlist: playlist,
+                                                    audioHandler:
+                                                        _audioHandler),
                                           ),
                                         );
                                       },
@@ -827,9 +855,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
-              const LibraryPage(),
-              // Add a placeholder for the User page
-              const UserPage(),
+              LibraryPage(audioHandler: _audioHandler),
+              UserPage(audioHandler: _audioHandler),
             ],
           ),
           // Add persistent mini player at the bottom
@@ -904,7 +931,7 @@ class _HomePageState extends State<HomePage> {
       enableDrag: true,
       builder: (context) => AudioPlayerPage(
         song: song,
-        audioPlayer: _audioPlayer,
+        audioHandler: _audioHandler,
         isPlaying: _isPlaying,
         duration: _duration,
         position: _position,
