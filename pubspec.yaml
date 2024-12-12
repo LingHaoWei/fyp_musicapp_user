@@ -44,6 +44,7 @@ dependencies:
   audio_service: ^0.18.12
   provider: ^6.1.1
   speech_to_text: ^6.4.1
+  flutter_cache_manager: ^3.4.1
 
 dev_dependencies:
   flutter_test:

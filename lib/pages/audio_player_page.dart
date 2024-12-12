@@ -130,7 +130,22 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                   physics: isMinimized
                       ? const NeverScrollableScrollPhysics()
                       : const AlwaysScrollableScrollPhysics(),
-                  child: isMinimized ? _buildMiniPlayer() : _buildFullPlayer(),
+                  child: isMinimized
+                      ? _buildMiniPlayer()
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            const SizedBox(height: 20),
+                            _buildAlbumArt(),
+                            const SizedBox(height: 40),
+                            _buildSongInfo(),
+                            const SizedBox(height: 40),
+                            _buildProgressBar(),
+                            const SizedBox(height: 40),
+                            _buildControls(),
+                            const SizedBox(height: 40),
+                          ],
+                        ),
                 ),
               ),
             ],
@@ -214,41 +229,26 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     );
   }
 
-  Widget _buildFullPlayer() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        const SizedBox(height: 32),
-        _buildAlbumArt(),
-        const SizedBox(height: 32),
-        _buildSongInfo(),
-        const SizedBox(height: 32),
-        _buildProgressBar(),
-        const SizedBox(height: 32),
-        _buildControls(),
-        const SizedBox(height: 32),
-      ],
-    );
-  }
-
   Widget _buildAlbumArt() {
     final album = _currentSong.album;
-    return Container(
-      width: 250,
-      height: 250,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        image: DecorationImage(
-          image: AssetImage('images/${album ?? 'logo'}.png'),
-          fit: BoxFit.cover,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+    return Center(
+      child: Container(
+        width: 280,
+        height: 280,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          image: DecorationImage(
+            image: AssetImage('images/${album ?? 'logo'}.png'),
+            fit: BoxFit.cover,
           ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -313,6 +313,21 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // Shuffle button
+        StreamBuilder<bool>(
+          stream: widget.audioHandler.shuffleModeStream,
+          builder: (context, snapshot) {
+            final isShuffling = snapshot.data ?? false;
+            return IconButton(
+              iconSize: 30,
+              icon: Icon(
+                Icons.shuffle,
+                color: isShuffling ? Colors.blue : Colors.white,
+              ),
+              onPressed: () => widget.audioHandler.setShuffleMode(!isShuffling),
+            );
+          },
+        ),
         IconButton(
           iconSize: 40,
           icon: const Icon(Icons.skip_previous),
@@ -347,6 +362,43 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
               _currentSong = widget.song;
               _isPlaying = widget.isPlaying;
             });
+          },
+        ),
+        // Loop button
+        StreamBuilder<LoopMode>(
+          stream: widget.audioHandler.loopModeStream,
+          builder: (context, snapshot) {
+            final loopMode = snapshot.data ?? LoopMode.off;
+            IconData icon;
+            Color? color;
+
+            switch (loopMode) {
+              case LoopMode.off:
+                icon = Icons.repeat;
+                color = Colors.white;
+                break;
+              case LoopMode.one:
+                icon = Icons.repeat_one;
+                color = Colors.blue;
+                break;
+              case LoopMode.all:
+                icon = Icons.repeat;
+                color = Colors.blue;
+                break;
+            }
+
+            return IconButton(
+              iconSize: 30,
+              icon: Icon(icon, color: color),
+              onPressed: () {
+                final nextMode = {
+                  LoopMode.off: LoopMode.all,
+                  LoopMode.all: LoopMode.one,
+                  LoopMode.one: LoopMode.off,
+                }[loopMode]!;
+                widget.audioHandler.setLoopMode(nextMode);
+              },
+            );
           },
         ),
       ],

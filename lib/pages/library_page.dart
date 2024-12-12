@@ -5,6 +5,7 @@ import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:fyp_musicapp_aws/models/ModelProvider.dart';
 import 'package:amplify_api/amplify_api.dart';
+import 'package:fyp_musicapp_aws/pages/audio_player_page.dart';
 
 class LibraryPage extends StatefulWidget {
   final AudioHandler audioHandler;
@@ -25,6 +26,12 @@ class _LibraryPageState extends State<LibraryPage> {
   String? _selectedGenre;
   bool _showAllGenres = false;
   String _userPreferredFileType = 'mp3'; // Default to mp3
+  Songs? _currentPlayingSong;
+  bool _isPlaying = false;
+  // ignore: prefer_final_fields
+  Duration _duration = Duration.zero;
+  // ignore: prefer_final_fields
+  Duration _position = Duration.zero;
 
   @override
   void initState() {
@@ -123,17 +130,62 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Future<void> _playSong(Songs song) async {
     try {
-      final title = song.title;
-      if (title == null) return;
+      if (widget.audioHandler.currentSong?.id == song.id) {
+        if (widget.audioHandler.isPlaying) {
+        } else {
+          await widget.audioHandler.play();
+        }
+        return;
+      }
 
-      final url = await Amplify.Storage.getUrl(
-        path: StoragePath.fromString('public/songs/${song.fileType}/$title'),
-        options: const StorageGetUrlOptions(),
-      ).result;
-
-      await widget.audioHandler.playSong(song, url.url.toString());
+      await _storeHistory(song);
+      await widget.audioHandler.playSong(song, _songs);
     } catch (e) {
       safePrint('Error playing song: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error playing song: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _storeHistory(Songs song) async {
+    try {
+      // Get current user
+      final user = await Amplify.Auth.getCurrentUser();
+      safePrint('Current user ID: ${user.userId}');
+
+      // Check if history entry already exists
+      final existingHistoryRequest = ModelQueries.list(
+        History.classType,
+        where: History.USERID.eq(user.userId).and(History.SONGID.eq(song.id)),
+      );
+      final existingHistoryResponse =
+          await Amplify.API.query(request: existingHistoryRequest).response;
+
+      if (existingHistoryResponse.data?.items.isNotEmpty ?? false) {
+        // Update existing history entry
+        final existingHistory = existingHistoryResponse.data!.items.first!;
+        final updateRequest = ModelMutations.update(existingHistory);
+        await Amplify.API.mutate(request: updateRequest).response;
+        safePrint('History entry updated for song: ${song.id}');
+        return;
+      }
+
+      // Create new history entry if it doesn't exist
+      final history = History(
+        userID: user.userId,
+        songID: song.id,
+      );
+
+      // Save to database
+      final request = ModelMutations.create(history);
+      await Amplify.API.mutate(request: request).response;
+
+      safePrint('New history entry stored successfully');
+    } catch (e) {
+      safePrint('Error storing/updating history: $e');
     }
   }
 
@@ -178,6 +230,27 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _playPreviousSong() async {
+    if (_songs.isEmpty || _currentPlayingSong == null) return;
+
+    final currentIndex =
+        _songs.indexWhere((s) => s.id == _currentPlayingSong?.id);
+    final previousIndex =
+        currentIndex <= 0 ? _songs.length - 1 : currentIndex - 1;
+
+    await _playSong(_songs[previousIndex]);
+  }
+
+  Future<void> _playNextSong() async {
+    if (_songs.isEmpty || _currentPlayingSong == null) return;
+
+    final currentIndex =
+        _songs.indexWhere((s) => s.id == _currentPlayingSong?.id);
+    final nextIndex = (currentIndex + 1) % _songs.length;
+
+    await _playSong(_songs[nextIndex]);
   }
 
   @override
@@ -282,7 +355,12 @@ class _LibraryPageState extends State<LibraryPage> {
                           ),
                           title: Text(song.title ?? 'Unknown Title'),
                           subtitle: Text(song.artist ?? 'Unknown Artist'),
-                          onTap: () => _playSong(song),
+                          onTap: () {
+                            if (_currentPlayingSong?.id != song.id) {
+                              _playSong(song);
+                            }
+                            _showAudioPlayer(song);
+                          },
                         );
                       },
                     ),
@@ -291,6 +369,28 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Use these methods in your UI
+  void _showAudioPlayer(Songs song) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: true,
+      builder: (context) => AudioPlayerPage(
+        song: song,
+        audioHandler: widget.audioHandler,
+        isPlaying: _isPlaying,
+        duration: _duration,
+        position: _position,
+        onPlayStateChanged: (isPlaying) =>
+            setState(() => _isPlaying = isPlaying),
+        onPreviousSong: _playPreviousSong,
+        onNextSong: _playNextSong,
       ),
     );
   }

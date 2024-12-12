@@ -4,13 +4,16 @@ import 'package:fyp_musicapp_aws/models/ModelProvider.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_api/amplify_api.dart';
 import 'playlist_details_page.dart';
+import 'package:fyp_musicapp_aws/services/playlist_handler.dart';
 
 class PlaylistPage extends StatefulWidget {
   final AudioHandler audioHandler;
+  final PlaylistHandler playlistHandler;
 
   const PlaylistPage({
     super.key,
     required this.audioHandler,
+    required this.playlistHandler,
   });
 
   @override
@@ -25,32 +28,19 @@ class _PlaylistPageState extends State<PlaylistPage> {
   @override
   void initState() {
     super.initState();
-    _fetchPlaylists();
+    _setupPlaylistHandler();
+    widget.playlistHandler.refreshPlaylists();
   }
 
-  Future<void> _fetchPlaylists() async {
-    try {
-      final user = await Amplify.Auth.getCurrentUser();
-      final request = ModelQueries.list(
-        Playlists.classType,
-        where: Playlists.USERID.eq(user.userId),
-      );
-
-      final response = await Amplify.API.query(request: request).response;
-      final items = response.data?.items;
-
+  void _setupPlaylistHandler() {
+    widget.playlistHandler.playlistsStream.listen((playlists) {
       if (mounted) {
         setState(() {
-          _playlists = items ?? [];
+          _playlists = playlists;
           _isLoading = false;
         });
       }
-    } catch (e) {
-      safePrint('Error fetching playlists: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+    });
   }
 
   Future<void> _createPlaylist(String name) async {
@@ -64,40 +54,163 @@ class _PlaylistPageState extends State<PlaylistPage> {
       final request = ModelMutations.create(newPlaylist);
       await Amplify.API.mutate(request: request).response;
 
-      _fetchPlaylists();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Playlist created successfully')),
-        );
-      }
+      // Refresh playlists through the handler
+      await widget.playlistHandler.refreshPlaylists();
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Playlist created successfully')),
+      );
     } catch (e) {
       safePrint('Error creating playlist: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error creating playlist')),
-        );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error creating playlist')),
+      );
+    }
+  }
+
+  Future<void> _renamePlaylist(Playlists playlist) async {
+    final controller = TextEditingController(text: playlist.name);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      final newName = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF202020),
+          title: const Text('Rename Playlist'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Enter new name',
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0xffa91d3a)),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0xffFDFDFD)),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel',
+                  style: TextStyle(color: Color(0xffFDFDFD))),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Save',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
+      if (newName == null ||
+          newName.isEmpty ||
+          newName == playlist.name ||
+          !mounted) {
+        controller.dispose();
+        return;
       }
+
+      final updatedPlaylist = playlist.copyWith(name: newName);
+      final request = ModelMutations.update(updatedPlaylist);
+      await Amplify.API.mutate(request: request).response;
+
+      // Refresh playlists through the handler
+      await widget.playlistHandler.refreshPlaylists();
+
+      if (!mounted) {
+        controller.dispose();
+        return;
+      }
+
+      Navigator.pop(context);
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('Playlist renamed successfully')),
+      );
+    } catch (e) {
+      safePrint('Error renaming playlist: $e');
+      if (!mounted) {
+        controller.dispose();
+        return;
+      }
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('Error renaming playlist')),
+      );
+    } finally {
+      controller.dispose();
     }
   }
 
   Future<void> _deletePlaylist(Playlists playlist) async {
-    try {
-      final request = ModelMutations.delete(playlist);
-      await Amplify.API.mutate(request: request).response;
+    if (!mounted) return;
 
-      _fetchPlaylists();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Playlist deleted successfully')),
-        );
+    // Show confirmation dialog
+    final bool confirmed = await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: const Color(0xFF202020),
+            title: const Text('Delete Playlist'),
+            content:
+                Text('Are you sure you want to delete "${playlist.name}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel',
+                    style: TextStyle(color: Color(0xffFDFDFD))),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xffa91d3a),
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed || !mounted) return;
+
+    try {
+      // First, delete all playlist items
+      final playlistItemsRequest = ModelQueries.list(
+        PlaylistItems.classType,
+        where: PlaylistItems.PLAYLISTID.eq(playlist.id),
+      );
+      final playlistItemsResponse =
+          await Amplify.API.query(request: playlistItemsRequest).response;
+
+      for (final item in playlistItemsResponse.data?.items ?? []) {
+        if (item != null) {
+          final deleteItemRequest = ModelMutations.delete<PlaylistItems>(item);
+          await Amplify.API.mutate(request: deleteItemRequest).response;
+        }
       }
+
+      // Then delete the playlist
+      final deleteRequest = ModelMutations.delete(playlist);
+      await Amplify.API.mutate(request: deleteRequest).response;
+
+      // Refresh playlists through the handler
+      await widget.playlistHandler.refreshPlaylists();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Playlist deleted successfully')),
+      );
     } catch (e) {
       safePrint('Error deleting playlist: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error deleting playlist')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error deleting playlist')),
+      );
     }
   }
 
@@ -224,9 +337,14 @@ class _PlaylistPageState extends State<PlaylistPage> {
                               builder: (context) => PlaylistDetailsPage(
                                 playlist: playlist,
                                 audioHandler: widget.audioHandler,
+                                playlistHandler: widget.playlistHandler,
                               ),
                             ),
-                          );
+                          ).then((needsRefresh) {
+                            if (needsRefresh == true) {
+                              widget.playlistHandler.refreshPlaylists();
+                            }
+                          });
                         },
                       ),
                     );
@@ -239,33 +357,26 @@ class _PlaylistPageState extends State<PlaylistPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF202020),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Rename Playlist'),
-              onTap: () {
-                Navigator.pop(context);
-                // Implement rename functionality
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Color(0xffa91d3a)),
-              title: const Text('Delete Playlist',
-                  style: TextStyle(
-                      color: Color(0xffa91d3a), fontWeight: FontWeight.bold)),
-              onTap: () {
-                Navigator.pop(context);
-                _deletePlaylist(playlist);
-              },
-            ),
-          ],
-        ),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.edit),
+            title: const Text('Rename Playlist'),
+            onTap: () {
+              Navigator.pop(context);
+              _renamePlaylist(playlist);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline),
+            title: const Text('Delete Playlist'),
+            onTap: () {
+              Navigator.pop(context);
+              _deletePlaylist(playlist);
+            },
+          ),
+        ],
       ),
     );
   }

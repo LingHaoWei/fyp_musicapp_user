@@ -7,13 +7,16 @@ import '../main.dart';
 import 'history_page.dart';
 import 'playlist_page.dart';
 import 'package:fyp_musicapp_aws/services/audio_handler.dart';
+import 'package:fyp_musicapp_aws/services/playlist_handler.dart';
 
 class UserPage extends StatefulWidget {
   final AudioHandler audioHandler;
+  final PlaylistHandler playlistHandler;
 
   const UserPage({
     super.key,
     required this.audioHandler,
+    required this.playlistHandler,
   });
 
   @override
@@ -84,8 +87,10 @@ class _UserPageState extends State<UserPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      PlaylistPage(audioHandler: widget.audioHandler),
+                  builder: (context) => PlaylistPage(
+                    audioHandler: widget.audioHandler,
+                    playlistHandler: widget.playlistHandler,
+                  ),
                 ),
               );
             },

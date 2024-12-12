@@ -5,7 +5,6 @@ import 'package:amplify_api/amplify_api.dart';
 import 'dart:async';
 import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 import 'package:fyp_musicapp_aws/pages/audio_player_page.dart';
-import 'package:fyp_musicapp_aws/widgets/persistent_mini_player.dart';
 
 class SearchPage extends StatefulWidget {
   final AudioHandler audioHandler;
@@ -55,17 +54,8 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> _playSong(Songs song) async {
     try {
-      final title = song.title;
-      if (title == null) return;
-
-      final url = await Amplify.Storage.getUrl(
-        path: StoragePath.fromString(
-            'public/songs/$_preferFileType/${song.title}'),
-        options: const StorageGetUrlOptions(),
-      ).result;
-
-      await widget.audioHandler.playSong(song, url.url.toString());
       await _storeHistory(song);
+      await widget.audioHandler.playSong(song, _searchResults);
     } catch (e) {
       safePrint('Error playing song: $e');
     }
@@ -127,9 +117,15 @@ class _SearchPageState extends State<SearchPage> {
                 isPlaying: widget.audioHandler.isPlaying,
                 duration: durationSnapshot.data ?? Duration.zero,
                 position: positionSnapshot.data ?? Duration.zero,
-                onPlayStateChanged: (_) {},
-                onPreviousSong: () {},
-                onNextSong: () {},
+                onPlayStateChanged: (isPlaying) {
+                  if (isPlaying) {
+                    widget.audioHandler.play();
+                  } else {
+                    widget.audioHandler.pause();
+                  }
+                },
+                onPreviousSong: _playPreviousSong,
+                onNextSong: _playNextSong,
               );
             },
           );
@@ -312,6 +308,33 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
+  Future<void> _playPreviousSong() async {
+    if (_searchResults.isEmpty || widget.audioHandler.currentSong == null) {
+      return;
+    }
+
+    final currentIndex = _searchResults
+        .indexWhere((s) => s.id == widget.audioHandler.currentSong?.id);
+    final previousIndex =
+        currentIndex <= 0 ? _searchResults.length - 1 : currentIndex - 1;
+
+    if (previousIndex >= 0) {
+      await _playSong(_searchResults[previousIndex]);
+    }
+  }
+
+  Future<void> _playNextSong() async {
+    if (_searchResults.isEmpty || widget.audioHandler.currentSong == null) {
+      return;
+    }
+
+    final currentIndex = _searchResults
+        .indexWhere((s) => s.id == widget.audioHandler.currentSong?.id);
+    final nextIndex = (currentIndex + 1) % _searchResults.length;
+
+    await _playSong(_searchResults[nextIndex]);
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Songs?>(
@@ -322,8 +345,6 @@ class _SearchPageState extends State<SearchPage> {
         return StreamBuilder<bool>(
           stream: widget.audioHandler.playingStream,
           builder: (context, playingSnapshot) {
-            final isPlaying = playingSnapshot.data ?? false;
-
             return Scaffold(
               appBar: AppBar(
                 backgroundColor: Colors.transparent,
@@ -405,32 +426,13 @@ class _SearchPageState extends State<SearchPage> {
                             },
                           ),
                           onTap: () {
-                            if (isCurrentSong) {
-                              _showAudioPlayer(song);
-                            } else {
+                            if (currentSong?.id != song.id) {
                               _playSong(song);
                             }
+                            _showAudioPlayer(song);
                           },
                         );
                       },
-                    ),
-                  if (currentSong != null)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: PersistentMiniPlayer(
-                        currentSong: currentSong,
-                        isPlaying: isPlaying,
-                        onTap: () => _showAudioPlayer(currentSong),
-                        onPlayPause: () {
-                          if (isPlaying) {
-                            widget.audioHandler.pause();
-                          } else {
-                            widget.audioHandler.play();
-                          }
-                        },
-                      ),
                     ),
                 ],
               ),
