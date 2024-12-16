@@ -307,95 +307,218 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _showAddToPlaylistModal(Songs song) async {
+  void _showPlaylistOptions(Songs song) async {
+    final user = await Amplify.Auth.getCurrentUser();
+
+    // Fetch user's playlists
+    final playlistRequest = ModelQueries.list(
+      Playlists.classType,
+      where: Playlists.USERID.eq(user.userId),
+    );
+    final playlistResponse =
+        await Amplify.API.query(request: playlistRequest).response;
+    final playlists =
+        playlistResponse.data?.items.whereType<Playlists>().toList() ?? [];
+
     if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF151515),
+      backgroundColor: const Color(0xFF202020),
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Add to Playlist',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+          ListTile(
+            leading: const Icon(Icons.add, color: Color(0xFFFDFDFD)),
+            title: const Text(
+              'Create New Playlist',
+              style: TextStyle(color: Color(0xFFFDFDFD)),
             ),
+            onTap: () {
+              Navigator.pop(context);
+              _showCreatePlaylistDialog(song);
+            },
           ),
-          if (_userPlaylists.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No playlists found. Create a playlist first.'),
-            )
-          else
-            Expanded(
-              child: ListView.builder(
-                itemCount: _userPlaylists.length,
-                itemBuilder: (context, index) {
-                  final playlist = _userPlaylists[index];
-                  return ListTile(
-                    title: Text(playlist?.name ?? 'Untitled Playlist'),
-                    onTap: () async {
-                      try {
-                        // Check for duplicate songs
-                        final existingSongsRequest = ModelQueries.list(
-                          PlaylistItems.classType,
-                          where: PlaylistItems.PLAYLISTID.eq(playlist!.id),
-                        );
-                        final existingSongsResponse = await Amplify.API
-                            .query(request: existingSongsRequest)
-                            .response;
-                        final existingSongs = existingSongsResponse.data?.items
-                                .whereType<PlaylistItems>()
-                                .toList() ??
-                            [];
+          if (playlists.isNotEmpty) const Divider(color: Color(0xFF303030)),
+          ...playlists.map((playlist) => ListTile(
+                leading:
+                    const Icon(Icons.playlist_add, color: Color(0xFFFDFDFD)),
+                title: Text(
+                  playlist.name ?? 'Untitled Playlist',
+                  style: const TextStyle(color: Color(0xFFFDFDFD)),
+                ),
+                onTap: () async {
+                  try {
+                    // Check if song already exists in playlist
+                    final existingRequest = ModelQueries.list(
+                      PlaylistItems.classType,
+                      where: PlaylistItems.PLAYLISTID
+                          .eq(playlist.id)
+                          .and(PlaylistItems.SONGID.eq(song.id)),
+                    );
+                    final existingResponse = await Amplify.API
+                        .query(request: existingRequest)
+                        .response;
 
-                        // Check if song already exists in playlist
-                        final isDuplicate =
-                            existingSongs.any((item) => item.SongID == song.id);
+                    if (existingResponse.data?.items.isEmpty ?? true) {
+                      // Add song to playlist
+                      final playlistSong = PlaylistItems(
+                        PlaylistID: playlist.id,
+                        SongID: song.id,
+                      );
+                      final request = ModelMutations.create(playlistSong);
+                      await Amplify.API.mutate(request: request).response;
 
-                        if (isDuplicate) {
-                          if (!context.mounted) return;
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'Song already exists in this playlist')),
+                      if (mounted) {
+                        final currentContext = context;
+                        if (currentContext.mounted) {
+                          ScaffoldMessenger.of(currentContext).showSnackBar(
+                            SnackBar(
+                              content: Text('Added to ${playlist.name}'),
+                              backgroundColor: const Color(0xffa91d3a),
+                            ),
                           );
-                          return;
                         }
-
-                        // Add song if not a duplicate
-                        final playlistSong = PlaylistItems(
-                          PlaylistID: playlist.id,
-                          SongID: song.id,
-                        );
-                        final request = ModelMutations.create(playlistSong);
-                        await Amplify.API.mutate(request: request).response;
-
-                        if (!context.mounted) return;
-
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Added to ${playlist.name}')),
-                        );
-                      } catch (e) {
-                        safePrint('Error adding song to playlist: $e');
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                      }
+                    } else {
+                      if (mounted) {
+                        final currentContext = context;
+                        if (currentContext.mounted) {
+                          ScaffoldMessenger.of(currentContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('Song already exists in playlist'),
+                              backgroundColor: Color(0xFF303030),
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    safePrint('Error adding song to playlist: $e');
+                    if (mounted) {
+                      final currentContext = context;
+                      if (currentContext.mounted) {
+                        ScaffoldMessenger.of(currentContext).showSnackBar(
                           const SnackBar(
-                              content: Text('Failed to add to playlist')),
+                            content: Text('Error adding song to playlist'),
+                            backgroundColor: Colors.red,
+                          ),
                         );
                       }
-                    },
-                  );
+                    }
+                  }
+                  if (mounted) {
+                    final currentContext = context;
+                    if (currentContext.mounted) {
+                      Navigator.pop(currentContext);
+                    }
+                  }
                 },
-              ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  void _showCreatePlaylistDialog(Songs song) {
+    final textController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF202020),
+        title: const Text(
+          'Create Playlist',
+          style: TextStyle(color: Color(0xFFFDFDFD)),
+        ),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          style: const TextStyle(color: Color(0xFFFDFDFD)),
+          decoration: const InputDecoration(
+            hintText: 'Playlist name',
+            hintStyle: TextStyle(color: Colors.grey),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.grey),
             ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xffa91d3a)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = textController.text.trim();
+              if (name.isEmpty) return;
+
+              try {
+                final user = await Amplify.Auth.getCurrentUser();
+
+                // Create new playlist
+                final playlist = Playlists(
+                  userID: user.userId,
+                  name: name,
+                );
+                final createPlaylistRequest = ModelMutations.create(playlist);
+                final playlistResponse = await Amplify.API
+                    .mutate(request: createPlaylistRequest)
+                    .response;
+
+                // Add song to the new playlist
+                if (playlistResponse.data != null) {
+                  final playlistSong = PlaylistItems(
+                    PlaylistID: playlistResponse.data!.id,
+                    SongID: song.id,
+                  );
+                  final request = ModelMutations.create(playlistSong);
+                  await Amplify.API.mutate(request: request).response;
+
+                  if (mounted) {
+                    final currentContext = context;
+                    if (currentContext.mounted) {
+                      ScaffoldMessenger.of(currentContext).showSnackBar(
+                        SnackBar(
+                          content: Text('Created playlist "$name" with song'),
+                          backgroundColor: const Color(0xffa91d3a),
+                        ),
+                      );
+                    }
+                  }
+                }
+              } catch (e) {
+                safePrint('Error creating playlist: $e');
+                if (mounted) {
+                  final currentContext = context;
+                  if (currentContext.mounted) {
+                    ScaffoldMessenger.of(currentContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Error creating playlist'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
+              if (mounted) {
+                final currentContext = context;
+                if (currentContext.mounted) {
+                  Navigator.pop(currentContext);
+                }
+              }
+            },
+            child: const Text(
+              'Create',
+              style: TextStyle(color: Color(0xffa91d3a)),
+            ),
+          ),
         ],
       ),
     );
@@ -513,32 +636,7 @@ class _HomePageState extends State<HomePage> {
                                             audioHandler: _audioHandler,
                                             onOptionsPressed: song != null
                                                 ? () {
-                                                    showModalBottomSheet(
-                                                      context: context,
-                                                      backgroundColor:
-                                                          const Color(
-                                                              0xFF151515),
-                                                      builder: (context) =>
-                                                          Column(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          ListTile(
-                                                            leading: const Icon(
-                                                                Icons
-                                                                    .playlist_add),
-                                                            title: const Text(
-                                                                'Add to Playlist'),
-                                                            onTap: () {
-                                                              Navigator.pop(
-                                                                  context);
-                                                              _showAddToPlaylistModal(
-                                                                  song);
-                                                            },
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    );
+                                                    _showPlaylistOptions(song);
                                                   }
                                                 : null,
                                           ),

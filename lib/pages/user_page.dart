@@ -57,128 +57,204 @@ class _UserPageState extends State<UserPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text('Profile'),
+        title: const Text(
+          'Profile',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
-      body: ListView(
-        children: [
-          // User Profile Section
-          const SizedBox(height: 20),
-          const CircleAvatar(
-            radius: 50,
-            child: Icon(Icons.person, size: 50),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            _userName,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Profile Header Section
+            Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF202020),
+                      border: Border.all(
+                        color: const Color(0xffa91d3a),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.person,
+                      size: 50,
+                      color: Color(0xFFFDFDFD),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _userName,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFDFDFD),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 30),
 
-          // Tile List
-          ListTile(
-            leading: const Icon(Icons.playlist_play),
-            title: const Text('My Playlists'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PlaylistPage(
-                    audioHandler: widget.audioHandler,
-                    playlistHandler: widget.playlistHandler,
+            // Menu Items
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF202020),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  _buildMenuItem(
+                    icon: Icons.queue_music,
+                    title: 'My Playlists',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PlaylistPage(
+                          audioHandler: widget.audioHandler,
+                          playlistHandler: widget.playlistHandler,
+                        ),
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
+                  _buildMenuItem(
+                    icon: Icons.history,
+                    title: 'Listening History',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HistoryPage(
+                          audioHandler: widget.audioHandler,
+                        ),
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
+                  _buildMenuItem(
+                    icon: Icons.settings,
+                    title: 'Settings',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsPage(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Sign Out Button
+            Container(
+              margin: const EdgeInsets.all(16),
+              child: ElevatedButton(
+                onPressed: () => _showSignOutDialog(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF202020),
+                  foregroundColor: const Color(0xffa91d3a),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  minimumSize: const Size(double.infinity, 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.history),
-            title: const Text('Listening History'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HistoryPage(
-                    audioHandler: widget.audioHandler,
+                child: const Text(
+                  'Sign Out',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('Settings'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SettingsPage(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          // Add Sign Out ListTile
-          ListTile(
-            leading: const Icon(Icons.logout, color: Color(0xffa91d3a)),
-            title: const Text('Sign Out',
-                style: TextStyle(
-                    color: Color(0xffa91d3a), fontWeight: FontWeight.bold)),
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    backgroundColor: const Color(0xFF151515),
-                    title: const Text('Sign Out'),
-                    content: const Text('Are you sure you want to sign out?'),
-                    actions: [
-                      TextButton(
-                        child: const Text('Cancel',
-                            style: TextStyle(color: Color(0xffFDFDFD))),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      TextButton(
-                        child: const Text('Sign Out',
-                            style: TextStyle(
-                              color: Color(0xffa91d3a),
-                              fontWeight: FontWeight.bold,
-                            )),
-                        onPressed: () async {
-                          try {
-                            await Amplify.Auth.signOut();
-                            if (!context.mounted) return;
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                  builder: (context) => const MyApp()),
-                              (route) => false,
-                            );
-                          } catch (e) {
-                            safePrint('Error signing out: $e');
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Error signing out')),
-                            );
-                          }
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-        ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: const Color(0xFFFDFDFD)),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Color(0xFFFDFDFD),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: const Icon(
+        Icons.chevron_right,
+        color: Color(0xFFFDFDFD),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildDivider() {
+    return const Divider(
+      height: 1,
+      thickness: 1,
+      indent: 16,
+      endIndent: 16,
+      color: Color(0xFF303030),
+    );
+  }
+
+  void _showSignOutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF202020),
+          title: const Text('Sign Out'),
+          content: const Text('Are you sure you want to sign out?'),
+          actions: [
+            TextButton(
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFFFDFDFD)),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await Amplify.Auth.signOut();
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const MyApp()),
+                    (route) => false,
+                  );
+                } catch (e) {
+                  safePrint('Error signing out: $e');
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Error signing out')),
+                  );
+                }
+              },
+              child: const Text(
+                'Sign Out',
+                style: TextStyle(
+                  color: Color(0xffa91d3a),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
