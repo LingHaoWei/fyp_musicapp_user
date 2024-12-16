@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fyp_musicapp_aws/models/ModelProvider.dart';
 import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class AudioPlayerPage extends StatefulWidget {
   final Songs song;
@@ -38,6 +39,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
       DraggableScrollableController();
   bool _isSheetAttached = false;
   late Songs _currentSong;
+  String? _cachedAlbumArtUrl;
 
   @override
   void initState() {
@@ -45,9 +47,18 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     _currentSong = widget.song;
     _isPlaying = widget.isPlaying;
     _setupPlayerListeners();
+    _loadAlbumArt();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() => _isSheetAttached = true);
     });
+  }
+
+  Future<void> _loadAlbumArt() async {
+    final album = _currentSong.album;
+    if (album != null) {
+      _cachedAlbumArtUrl = await widget.audioHandler.getAlbumArtUrl(album);
+      if (mounted) setState(() {});
+    }
   }
 
   void _setupPlayerListeners() {
@@ -156,7 +167,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   }
 
   Widget _buildMiniPlayer() {
-    final album = _currentSong.album;
     return Container(
       height: 60,
       color: const Color(0xFF151515),
@@ -167,13 +177,38 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             width: 40,
             height: 40,
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              image: DecorationImage(
-                image: AssetImage('images/${album ?? 'logo'}.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
+            child: _cachedAlbumArtUrl == null
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Center(child: CircularProgressIndicator()),
+                  )
+                : _cachedAlbumArtUrl!.isEmpty
+                    ? Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.music_note, size: 20),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: CachedNetworkImage(
+                          imageUrl: _cachedAlbumArtUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[800],
+                            child: const Center(
+                                child: CircularProgressIndicator()),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.error),
+                          ),
+                        ),
+                      ),
           ),
           // Song info
           Expanded(
@@ -230,17 +265,12 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   }
 
   Widget _buildAlbumArt() {
-    final album = _currentSong.album;
     return Center(
       child: Container(
         width: 280,
         height: 280,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          image: DecorationImage(
-            image: AssetImage('images/${album ?? 'logo'}.png'),
-            fit: BoxFit.cover,
-          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.3),
@@ -249,6 +279,37 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             ),
           ],
         ),
+        child: _cachedAlbumArtUrl == null
+            ? Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Center(child: CircularProgressIndicator()),
+              )
+            : _cachedAlbumArtUrl!.isEmpty
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(Icons.music_note, size: 80),
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: CachedNetworkImage(
+                      imageUrl: _cachedAlbumArtUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[800],
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[800],
+                        child: const Icon(Icons.error),
+                      ),
+                    ),
+                  ),
       ),
     );
   }

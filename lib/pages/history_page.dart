@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_api/amplify_api.dart';
 import '../models/ModelProvider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  final AudioHandler audioHandler;
+
+  const HistoryPage({
+    super.key,
+    required this.audioHandler,
+  });
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -100,17 +107,47 @@ class _HistoryPageState extends State<HistoryPage> {
                         }
 
                         return ListTile(
-                          leading: Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              image: DecorationImage(
-                                image: AssetImage(
-                                    'images/${song.album ?? 'logo'}.png'),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
+                          leading: FutureBuilder<String>(
+                            future: widget.audioHandler
+                                .getAlbumArtUrl(song.album ?? 'logo'),
+                            builder: (context, snapshot) {
+                              return Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: !snapshot.hasData
+                                    ? Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[800],
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: const Center(
+                                            child: CircularProgressIndicator()),
+                                      )
+                                    : ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: CachedNetworkImage(
+                                          imageUrl: snapshot.data!,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) =>
+                                              Container(
+                                            color: Colors.grey[800],
+                                            child: const Center(
+                                                child:
+                                                    CircularProgressIndicator()),
+                                          ),
+                                          errorWidget: (context, url, error) =>
+                                              Container(
+                                            color: Colors.grey[800],
+                                            child: const Icon(Icons.music_note),
+                                          ),
+                                        ),
+                                      ),
+                              );
+                            },
                           ),
                           title: Text(song.title ?? 'Unknown Title'),
                           subtitle: Text(song.artist ?? 'Unknown Artist'),

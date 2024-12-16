@@ -5,6 +5,7 @@ import 'package:amplify_api/amplify_api.dart';
 import 'dart:async';
 import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 import 'package:fyp_musicapp_aws/pages/audio_player_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SearchPage extends StatefulWidget {
   final AudioHandler audioHandler;
@@ -376,21 +377,47 @@ class _SearchPageState extends State<SearchPage> {
                         final isCurrentSong = currentSong?.id == song.id;
 
                         return ListTile(
-                          leading: Stack(
-                            children: [
-                              Container(
+                          leading: FutureBuilder<String>(
+                            future: widget.audioHandler
+                                .getAlbumArtUrl(song.album ?? 'logo'),
+                            builder: (context, snapshot) {
+                              return Container(
                                 width: 50,
                                 height: 50,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(8),
-                                  image: DecorationImage(
-                                    image: AssetImage(
-                                        'images/${song.album ?? 'logo'}.png'),
-                                    fit: BoxFit.cover,
-                                  ),
                                 ),
-                              ),
-                            ],
+                                child: !snapshot.hasData
+                                    ? Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[800],
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: const Center(
+                                            child: CircularProgressIndicator()),
+                                      )
+                                    : ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: CachedNetworkImage(
+                                          imageUrl: snapshot.data!,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) =>
+                                              Container(
+                                            color: Colors.grey[800],
+                                            child: const Center(
+                                                child:
+                                                    CircularProgressIndicator()),
+                                          ),
+                                          errorWidget: (context, url, error) =>
+                                              Container(
+                                            color: Colors.grey[800],
+                                            child: const Icon(Icons.music_note),
+                                          ),
+                                        ),
+                                      ),
+                              );
+                            },
                           ),
                           title: Text(
                             song.title ?? 'Unknown Title',
@@ -402,7 +429,6 @@ class _SearchPageState extends State<SearchPage> {
                                   isCurrentSong ? FontWeight.bold : null,
                             ),
                           ),
-                          subtitle: Text(song.artist ?? 'Unknown Artist'),
                           trailing: IconButton(
                             icon: const Icon(Icons.more_vert),
                             onPressed: () {

@@ -104,7 +104,9 @@ class _UserPageState extends State<UserPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const HistoryPage(),
+                  builder: (context) => HistoryPage(
+                    audioHandler: widget.audioHandler,
+                  ),
                 ),
               );
             },

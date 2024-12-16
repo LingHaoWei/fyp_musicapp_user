@@ -420,26 +420,28 @@ class _HomePageState extends State<HomePage> {
           children: [
             // App Bar
             Padding(
-              padding: EdgeInsets.all(padding),
+              padding: EdgeInsets.symmetric(
+                  horizontal: padding, vertical: padding / 2),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Image.asset(
                     'images/logo.png',
-                    width: logoSize,
+                    width: logoSize * 1,
                   ),
                   Row(
                     children: [
                       Text(
                         'Welcome!\n$_userName',
                         style: TextStyle(
-                          fontSize: isTablet ? 16 : 14,
+                          fontSize: isTablet ? 14 : 12,
                           color: const Color(0xFFFDFDFD),
                         ),
                         textAlign: TextAlign.end,
                       ),
                       IconButton(
-                        icon: const Icon(Icons.person),
+                        icon: const Icon(Icons.person, size: 22),
+                        padding: const EdgeInsets.all(8),
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -619,7 +621,7 @@ class _HomePageState extends State<HomePage> {
                                               BorderRadius.circular(8),
                                         ),
                                         child: const Icon(
-                                          Icons.queue_music,
+                                          Icons.queue_music_rounded,
                                           color: Color(0xff909090),
                                         ),
                                       ),
@@ -667,6 +669,7 @@ class _HomePageState extends State<HomePage> {
             // Mini Player and Navigation
             if (_currentSong != null)
               PersistentMiniPlayer(
+                audioHandler: _audioHandler,
                 currentSong: _currentSong,
                 isPlaying: _isPlaying,
                 onTap: () {

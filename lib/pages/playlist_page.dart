@@ -271,7 +271,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.queue_music,
+                      const Icon(Icons.queue_music_rounded,
                           size: 64, color: Colors.grey),
                       const SizedBox(height: 16),
                       const Text(
@@ -314,7 +314,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
-                            Icons.queue_music,
+                            Icons.queue_music_rounded,
                             size: 32,
                             color: Color(0xff909090),
                           ),

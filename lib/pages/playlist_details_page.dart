@@ -5,6 +5,7 @@ import 'package:amplify_api/amplify_api.dart';
 import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 import 'package:fyp_musicapp_aws/pages/audio_player_page.dart';
 import 'package:fyp_musicapp_aws/services/playlist_handler.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class PlaylistDetailsPage extends StatefulWidget {
   final Playlists playlist;
@@ -285,61 +286,6 @@ class _PlaylistDetailsPageState extends State<PlaylistDetailsPage> {
     await _playSong(_playlistSongs[nextIndex]);
   }
 
-  Widget _buildSongTile(Songs song) {
-    final isCurrentSong = _currentPlayingSong?.id == song.id;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(4),
-          image: DecorationImage(
-            image: AssetImage('images/${song.album ?? 'logo'}.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-      ),
-      title: Text(
-        song.title ?? 'Unknown Title',
-        style: TextStyle(
-          color: isCurrentSong ? Theme.of(context).primaryColor : null,
-          fontWeight: isCurrentSong ? FontWeight.bold : null,
-        ),
-      ),
-      subtitle: Text(song.artist ?? 'Unknown Artist'),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (isCurrentSong)
-            IconButton(
-              icon: Icon(
-                _isPlaying ? Icons.pause : Icons.play_arrow,
-                color: Theme.of(context).primaryColor,
-              ),
-              onPressed: () {
-                if (_isPlaying) {
-                  widget.audioHandler.pause();
-                } else {
-                  widget.audioHandler.play();
-                }
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () => _showSongOptions(song),
-          ),
-        ],
-      ),
-      onTap: () {
-        if (_currentPlayingSong?.id != song.id) {
-          _playSong(song);
-        }
-        _showAudioPlayer(song);
-      },
-    );
-  }
-
   // Use these methods in your UI
   void _showAudioPlayer(Songs song) {
     showModalBottomSheet(
@@ -539,18 +485,98 @@ class _PlaylistDetailsPageState extends State<PlaylistDetailsPage> {
                         itemCount: _playlistSongs.length,
                         itemBuilder: (context, index) {
                           final song = _playlistSongs[index];
-                          return Dismissible(
-                            key: Key(song.id),
-                            background: Container(
-                              color: Colors.red,
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 16),
-                              child:
-                                  const Icon(Icons.delete, color: Colors.white),
+                          final isCurrentSong =
+                              _currentPlayingSong?.id == song.id;
+
+                          return ListTile(
+                            leading: FutureBuilder<String>(
+                              future: widget.audioHandler
+                                  .getAlbumArtUrl(song.album ?? 'logo'),
+                              builder: (context, snapshot) {
+                                return Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: !snapshot.hasData
+                                      ? Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[800],
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: const Center(
+                                              child:
+                                                  CircularProgressIndicator()),
+                                        )
+                                      : ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: CachedNetworkImage(
+                                            imageUrl: snapshot.data!,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) =>
+                                                Container(
+                                              color: Colors.grey[800],
+                                              child: const Center(
+                                                  child:
+                                                      CircularProgressIndicator()),
+                                            ),
+                                            errorWidget:
+                                                (context, url, error) =>
+                                                    Container(
+                                              color: Colors.grey[800],
+                                              child:
+                                                  const Icon(Icons.music_note),
+                                            ),
+                                          ),
+                                        ),
+                                );
+                              },
                             ),
-                            direction: DismissDirection.endToStart,
-                            onDismissed: (_) => _removeSong(song),
-                            child: _buildSongTile(song),
+                            title: Text(
+                              song.title ?? 'Unknown Title',
+                              style: TextStyle(
+                                color: isCurrentSong
+                                    ? Theme.of(context).primaryColor
+                                    : null,
+                                fontWeight:
+                                    isCurrentSong ? FontWeight.bold : null,
+                              ),
+                            ),
+                            subtitle: Text(song.artist ?? 'Unknown Artist'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isCurrentSong)
+                                  IconButton(
+                                    icon: Icon(
+                                      _isPlaying
+                                          ? Icons.pause
+                                          : Icons.play_arrow,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                    onPressed: () {
+                                      if (_isPlaying) {
+                                        widget.audioHandler.pause();
+                                      } else {
+                                        widget.audioHandler.play();
+                                      }
+                                    },
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.more_vert),
+                                  onPressed: () => _showSongOptions(song),
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              if (_currentPlayingSong?.id != song.id) {
+                                _playSong(song);
+                              }
+                              _showAudioPlayer(song);
+                            },
                           );
                         },
                       ),
