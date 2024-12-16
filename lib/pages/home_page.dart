@@ -504,11 +504,11 @@ class _HomePageState extends State<HomePage> {
                                           child: SongCard(
                                             width: isTablet ? 200 : 160,
                                             height: isTablet ? 260 : 220,
-                                            imageUrl:
-                                                'images/${song?.album ?? 'logo'}.png',
+                                            imageUrl: song?.album ?? 'logo',
                                             songName: song?.title ?? 'Unknown',
                                             artistName: song?.artist ??
                                                 'Unknown Artist',
+                                            audioHandler: _audioHandler,
                                             onOptionsPressed: song != null
                                                 ? () {
                                                     showModalBottomSheet(

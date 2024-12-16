@@ -114,6 +114,29 @@ class AudioHandler {
     return url;
   }
 
+  Future<String> getAlbumArtUrl(String? album) async {
+    if (album == null) return '';
+
+    final cacheKey = 'album_$album';
+    if (_urlCache.containsKey(cacheKey)) {
+      return _urlCache[cacheKey]!;
+    }
+
+    try {
+      final result = await Amplify.Storage.getUrl(
+        path: StoragePath.fromString('public/images/$album.png'),
+        options: const StorageGetUrlOptions(),
+      ).result;
+
+      final url = result.url.toString();
+      _urlCache[cacheKey] = url;
+      return url;
+    } catch (e) {
+      safePrint('Error getting album art: $e');
+      return '';
+    }
+  }
+
   Future<void> _preloadNextSongs() async {
     for (var i = 0; i < 2 && _preloadQueue.isNotEmpty; i++) {
       final nextSong = _preloadQueue.removeFirst();

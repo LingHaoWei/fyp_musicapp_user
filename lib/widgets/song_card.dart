@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:fyp_musicapp_aws/services/audio_handler.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SongCard extends StatelessWidget {
   final double width;
@@ -7,6 +9,7 @@ class SongCard extends StatelessWidget {
   final String songName;
   final String artistName;
   final VoidCallback? onOptionsPressed;
+  final AudioHandler audioHandler;
 
   const SongCard({
     super.key,
@@ -15,6 +18,7 @@ class SongCard extends StatelessWidget {
     required this.imageUrl,
     required this.songName,
     required this.artistName,
+    required this.audioHandler,
     this.onOptionsPressed,
   });
 
@@ -35,21 +39,58 @@ class SongCard extends StatelessWidget {
           SizedBox(
             width: imageSize,
             height: imageSize,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                image: DecorationImage(
-                  image: AssetImage(imageUrl),
-                  fit: BoxFit.cover,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+            child: FutureBuilder<String>(
+              future: audioHandler.getAlbumArtUrl(imageUrl),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                final imageUrl = snapshot.data;
+                if (imageUrl == null || imageUrl.isEmpty) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.music_note, size: 50),
+                  );
+                }
+
+                return Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[800],
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[800],
+                        child: const Icon(Icons.error),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 8),
