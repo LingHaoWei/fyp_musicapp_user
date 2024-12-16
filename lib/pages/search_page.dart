@@ -26,11 +26,16 @@ class _SearchPageState extends State<SearchPage> {
   String _preferFileType = 'mp3';
   Timer? _debounce;
   String _searchText = '';
+  final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _loadUserPreferences();
+    // Auto focus the search field when the page opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocusNode.requestFocus();
+    });
   }
 
   Future<void> _loadUserPreferences() async {
@@ -341,8 +346,6 @@ class _SearchPageState extends State<SearchPage> {
     return StreamBuilder<Songs?>(
       stream: widget.audioHandler.currentSongStream,
       builder: (context, songSnapshot) {
-        final currentSong = songSnapshot.data;
-
         return StreamBuilder<bool>(
           stream: widget.audioHandler.playingStream,
           builder: (context, playingSnapshot) {
@@ -353,113 +356,80 @@ class _SearchPageState extends State<SearchPage> {
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () => Navigator.pop(context),
                 ),
-                title: TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  decoration: const InputDecoration(
-                    hintText: 'Search songs...',
-                    border: InputBorder.none,
+                title: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF202020),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  style: const TextStyle(color: Colors.white),
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    onChanged: _onSearchChanged,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search songs...',
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 16,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Colors.grey,
+                      ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchText = '';
+                                  _searchResults.clear();
+                                });
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              body: Stack(
+              body: Column(
                 children: [
-                  if (_isLoading)
-                    const Center(child: CircularProgressIndicator())
-                  else if (_searchResults.isEmpty && _searchText.isNotEmpty)
-                    const Center(child: Text('No results found'))
-                  else
-                    ListView.builder(
-                      itemCount: _searchResults.length,
-                      itemBuilder: (context, index) {
-                        final song = _searchResults[index];
-                        final isCurrentSong = currentSong?.id == song.id;
-
-                        return ListTile(
-                          leading: FutureBuilder<String>(
-                            future: widget.audioHandler
-                                .getAlbumArtUrl(song.album ?? 'logo'),
-                            builder: (context, snapshot) {
-                              return Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: !snapshot.hasData
-                                    ? Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[800],
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: const Center(
-                                            child: CircularProgressIndicator()),
-                                      )
-                                    : ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: CachedNetworkImage(
-                                          imageUrl: snapshot.data!,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) =>
-                                              Container(
-                                            color: Colors.grey[800],
-                                            child: const Center(
-                                                child:
-                                                    CircularProgressIndicator()),
-                                          ),
-                                          errorWidget: (context, url, error) =>
-                                              Container(
-                                            color: Colors.grey[800],
-                                            child: const Icon(Icons.music_note),
-                                          ),
-                                        ),
-                                      ),
-                              );
-                            },
-                          ),
-                          title: Text(
-                            song.title ?? 'Unknown Title',
-                            style: TextStyle(
-                              color: isCurrentSong
-                                  ? Theme.of(context).primaryColor
-                                  : null,
-                              fontWeight:
-                                  isCurrentSong ? FontWeight.bold : null,
+                  if (_searchText.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Results for "$_searchText"',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
                             ),
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.more_vert),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                backgroundColor: const Color(0xFF151515),
-                                builder: (context) => Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ListTile(
-                                      leading: const Icon(Icons.playlist_add),
-                                      title: const Text('Add to Playlist'),
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _showAddToPlaylistModal(song);
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                          onTap: () {
-                            if (currentSong?.id != song.id) {
-                              _playSong(song);
-                            }
-                            _showAudioPlayer(song);
-                          },
-                        );
-                      },
+                          const SizedBox(width: 8),
+                          if (_isLoading)
+                            const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
+                  Expanded(
+                    child: _buildContent(),
+                  ),
                 ],
               ),
             );
@@ -469,10 +439,229 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
+  Widget _buildContent() {
+    if (_isLoading && _searchResults.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Searching...',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_searchText.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search,
+              size: 64,
+              color: Colors.grey[700],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Search for songs',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[400],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Find your favorite songs by title or artist',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.music_off,
+              size: 64,
+              color: Colors.grey[700],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No results found for "$_searchText"',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[400],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final song = _searchResults[index];
+        final isCurrentSong = widget.audioHandler.currentSong?.id == song.id;
+        final isPlaying = isCurrentSong && widget.audioHandler.isPlaying;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: isCurrentSong ? const Color(0xFF202020) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 4,
+            ),
+            leading: Hero(
+              tag: 'album_art_${song.id}',
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: FutureBuilder<String>(
+                  future:
+                      widget.audioHandler.getAlbumArtUrl(song.album ?? 'logo'),
+                  builder: (context, snapshot) {
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: !snapshot.hasData
+                          ? Container(
+                              color: Colors.grey[800],
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : CachedNetworkImage(
+                              imageUrl: snapshot.data!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[800],
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey[800],
+                                child: const Icon(Icons.music_note),
+                              ),
+                            ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            title: Text(
+              song.title ?? 'Unknown Title',
+              style: TextStyle(
+                color: isCurrentSong ? Theme.of(context).primaryColor : null,
+                fontWeight: isCurrentSong ? FontWeight.bold : null,
+              ),
+            ),
+            subtitle: Text(
+              song.artist ?? 'Unknown Artist',
+              style: TextStyle(
+                color: isCurrentSong
+                    ? Theme.of(context).primaryColor.withOpacity(0.7)
+                    : Colors.grey,
+                fontSize: 12,
+              ),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isCurrentSong)
+                  IconButton(
+                    icon: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                    onPressed: () {
+                      if (isPlaying) {
+                        widget.audioHandler.pause();
+                      } else {
+                        widget.audioHandler.play();
+                      }
+                    },
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.more_vert),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      backgroundColor: const Color(0xFF151515),
+                      builder: (context) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.playlist_add),
+                            title: const Text('Add to Playlist'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _showAddToPlaylistModal(song);
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            onTap: () {
+              if (widget.audioHandler.currentSong?.id != song.id) {
+                _playSong(song);
+              }
+              _showAudioPlayer(song);
+            },
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 }

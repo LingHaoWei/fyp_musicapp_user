@@ -27,22 +27,6 @@ class SongCard extends StatefulWidget {
 }
 
 class _SongCardState extends State<SongCard> {
-  String? _cachedAlbumArtUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAlbumArt();
-  }
-
-  Future<void> _loadAlbumArt() async {
-    if (widget.imageUrl.isNotEmpty) {
-      _cachedAlbumArtUrl =
-          await widget.audioHandler.getAlbumArtUrl(widget.imageUrl);
-      if (mounted) setState(() {});
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 600;
@@ -60,50 +44,58 @@ class _SongCardState extends State<SongCard> {
           SizedBox(
             width: imageSize,
             height: imageSize,
-            child: _cachedAlbumArtUrl == null
-                ? Container(
+            child: FutureBuilder<String>(
+              future: widget.audioHandler.getAlbumArtUrl(widget.imageUrl),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Container(
                     decoration: BoxDecoration(
                       color: Colors.grey[800],
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Center(child: CircularProgressIndicator()),
-                  )
-                : _cachedAlbumArtUrl!.isEmpty
-                    ? Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[800],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.music_note, size: 50),
-                      )
-                    : Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: CachedNetworkImage(
-                            imageUrl: _cachedAlbumArtUrl!,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[800],
-                              child: const Center(
-                                  child: CircularProgressIndicator()),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey[800],
-                              child: const Icon(Icons.error),
-                            ),
-                          ),
-                        ),
+                  );
+                }
+
+                if (snapshot.data!.isEmpty) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.music_note, size: 50),
+                  );
+                }
+
+                return Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: CachedNetworkImage(
+                      imageUrl: snapshot.data!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[800],
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[800],
+                        child: const Icon(Icons.error),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 8),
           Row(
