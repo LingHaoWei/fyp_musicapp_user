@@ -43,6 +43,13 @@ class _HomePageState extends State<HomePage> {
   // Add this property
   final List<Playlists?> _userPlaylists = [];
 
+  late StreamSubscription _playbackSubscription;
+  late StreamSubscription _durationSubscription;
+  late StreamSubscription _positionSubscription;
+  late StreamSubscription _currentSongSubscription;
+  late StreamSubscription _playingSubscription;
+  late StreamSubscription _playlistSubscription;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -64,32 +71,32 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _setupAudioPlayer() {
-    _audioHandler.playbackState.listen((state) {
+    _playbackSubscription = _audioHandler.playbackState.listen((state) {
       if (!mounted) return;
       setState(() {
         _isPlaying = state.playing;
       });
     });
 
-    _audioHandler.durationStream.listen((duration) {
+    _durationSubscription = _audioHandler.durationStream.listen((duration) {
       if (duration != null && mounted) {
         setState(() => _duration = duration);
       }
     });
 
-    _audioHandler.positionStream.listen((position) {
+    _positionSubscription = _audioHandler.positionStream.listen((position) {
       if (mounted) {
         setState(() => _position = position);
       }
     });
 
-    _audioHandler.currentSongStream.listen((song) {
+    _currentSongSubscription = _audioHandler.currentSongStream.listen((song) {
       if (mounted) {
         setState(() => _currentSong = song);
       }
     });
 
-    _audioHandler.playingStream.listen((playing) {
+    _playingSubscription = _audioHandler.playingStream.listen((playing) {
       if (mounted) {
         setState(() => _isPlaying = playing);
       }
@@ -283,7 +290,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _setupPlaylistHandler() {
-    _playlistHandler.playlistsStream.listen((playlists) {
+    _playlistSubscription =
+        _playlistHandler.playlistsStream.listen((playlists) {
       if (mounted) {
         setState(() {
           _userPlaylists.clear();
@@ -374,7 +382,13 @@ class _HomePageState extends State<HomePage> {
                         if (currentContext.mounted) {
                           ScaffoldMessenger.of(currentContext).showSnackBar(
                             SnackBar(
-                              content: Text('Added to ${playlist.name}'),
+                              content: Text(
+                                'Added to ${playlist.name}',
+                                style: const TextStyle(
+                                  color: Color(0xFFFDFDFD),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               backgroundColor: const Color(0xffa91d3a),
                             ),
                           );
@@ -386,7 +400,13 @@ class _HomePageState extends State<HomePage> {
                         if (currentContext.mounted) {
                           ScaffoldMessenger.of(currentContext).showSnackBar(
                             const SnackBar(
-                              content: Text('Song already exists in playlist'),
+                              content: Text(
+                                'Song already exists in playlist',
+                                style: TextStyle(
+                                  color: Color(0xFFFDFDFD),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               backgroundColor: Color(0xFF303030),
                             ),
                           );
@@ -400,7 +420,13 @@ class _HomePageState extends State<HomePage> {
                       if (currentContext.mounted) {
                         ScaffoldMessenger.of(currentContext).showSnackBar(
                           const SnackBar(
-                            content: Text('Error adding song to playlist'),
+                            content: Text(
+                              'Error adding song to playlist',
+                              style: TextStyle(
+                                color: Color(0xFFFDFDFD),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -562,19 +588,13 @@ class _HomePageState extends State<HomePage> {
                         ),
                         textAlign: TextAlign.end,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.person, size: 22),
-                        padding: const EdgeInsets.all(8),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => UserPage(
-                              audioHandler: _audioHandler,
-                              playlistHandler: _playlistHandler,
-                            ),
-                          ),
-                        ),
-                      ),
+                      const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(
+                            Icons.person,
+                            size: 22,
+                            color: Color(0xFFFDFDFD),
+                          ))
                     ],
                   ),
                 ],
@@ -709,7 +729,7 @@ class _HomePageState extends State<HomePage> {
                                     return ListTile(
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                              vertical: 4),
+                                              vertical: 12),
                                       leading: Container(
                                         width: 48,
                                         height: 48,
@@ -728,11 +748,6 @@ class _HomePageState extends State<HomePage> {
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                         ),
-                                      ),
-                                      subtitle: Text(
-                                        '${snapshot.data ?? 0} songs',
-                                        style:
-                                            const TextStyle(color: Colors.grey),
                                       ),
                                       onTap: () {
                                         Navigator.push(
@@ -842,8 +857,13 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _playbackSubscription.cancel();
+    _durationSubscription.cancel();
+    _positionSubscription.cancel();
+    _currentSongSubscription.cancel();
+    _playingSubscription.cancel();
+    _playlistSubscription.cancel();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
-    _audioPlayer.stop();
     _audioPlayer.dispose();
     _playlistHandler.dispose();
     super.dispose();

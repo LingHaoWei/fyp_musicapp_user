@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:fyp_musicapp_aws/models/ModelProvider.dart';
@@ -30,6 +31,10 @@ class _PlaylistDetailsPageState extends State<PlaylistDetailsPage> {
   Songs? _currentPlayingSong;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
+  late StreamSubscription _playingSubscription;
+  late StreamSubscription _currentSongSubscription;
+  late StreamSubscription _durationSubscription;
+  late StreamSubscription _positionSubscription;
 
   @override
   void initState() {
@@ -39,29 +44,41 @@ class _PlaylistDetailsPageState extends State<PlaylistDetailsPage> {
   }
 
   void _setupAudioHandler() {
-    widget.audioHandler.playingStream.listen((playing) {
+    _playingSubscription = widget.audioHandler.playingStream.listen((playing) {
       if (mounted) {
         setState(() => _isPlaying = playing);
       }
     });
 
-    widget.audioHandler.currentSongStream.listen((song) {
+    _currentSongSubscription =
+        widget.audioHandler.currentSongStream.listen((song) {
       if (mounted) {
         setState(() => _currentPlayingSong = song);
       }
     });
 
-    widget.audioHandler.durationStream.listen((duration) {
+    _durationSubscription =
+        widget.audioHandler.durationStream.listen((duration) {
       if (duration != null && mounted) {
         setState(() => _duration = duration);
       }
     });
 
-    widget.audioHandler.positionStream.listen((position) {
+    _positionSubscription =
+        widget.audioHandler.positionStream.listen((position) {
       if (mounted) {
         setState(() => _position = position);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _playingSubscription.cancel();
+    _currentSongSubscription.cancel();
+    _durationSubscription.cancel();
+    _positionSubscription.cancel();
+    super.dispose();
   }
 
   Future<void> _loadPlaylistSongs() async {

@@ -270,7 +270,13 @@ class _SearchPageState extends State<SearchPage> {
                         if (currentContext.mounted) {
                           ScaffoldMessenger.of(currentContext).showSnackBar(
                             SnackBar(
-                              content: Text('Added to ${playlist.name}'),
+                              content: Text(
+                                'Added to ${playlist.name}',
+                                style: const TextStyle(
+                                  color: Color(0xFFFDFDFD),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               backgroundColor: const Color(0xffa91d3a),
                             ),
                           );
@@ -282,7 +288,13 @@ class _SearchPageState extends State<SearchPage> {
                         if (currentContext.mounted) {
                           ScaffoldMessenger.of(currentContext).showSnackBar(
                             const SnackBar(
-                              content: Text('Song already exists in playlist'),
+                              content: Text(
+                                'Song already exists in playlist',
+                                style: TextStyle(
+                                  color: Color(0xFFFDFDFD),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               backgroundColor: Color(0xFF303030),
                             ),
                           );
@@ -296,7 +308,13 @@ class _SearchPageState extends State<SearchPage> {
                       if (currentContext.mounted) {
                         ScaffoldMessenger.of(currentContext).showSnackBar(
                           const SnackBar(
-                            content: Text('Error adding song to playlist'),
+                            content: Text(
+                              'Error adding song to playlist',
+                              style: TextStyle(
+                                color: Color(0xFFFDFDFD),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                             backgroundColor: Colors.red,
                           ),
                         );
