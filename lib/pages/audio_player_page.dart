@@ -158,7 +158,15 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
 
           return Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF151515),
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF2A1A1A),
+                  Color(0xFF151515),
+                ],
+                stops: [0.0, 0.8],
+              ),
               borderRadius: BorderRadius.vertical(
                 top: Radius.circular(isMinimized ? 0 : 20),
               ),
