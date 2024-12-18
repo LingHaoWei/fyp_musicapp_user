@@ -229,9 +229,44 @@ class _UserPageState extends State<UserPage> {
             ),
             TextButton(
               onPressed: () async {
+                // Close the confirmation dialog first
+                Navigator.of(context).pop();
+
+                // Show loading dialog
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext context) {
+                    return const Dialog(
+                      backgroundColor: Color(0xFF202020),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(
+                              color: Color(0xffa91d3a),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Signing out...',
+                              style: TextStyle(
+                                color: Color(0xFFFDFDFD),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+
                 try {
                   await Amplify.Auth.signOut();
                   if (!context.mounted) return;
+                  // Pop the loading dialog
+                  Navigator.of(context).pop();
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => const MyApp()),
                     (route) => false,
@@ -239,8 +274,16 @@ class _UserPageState extends State<UserPage> {
                 } catch (e) {
                   safePrint('Error signing out: $e');
                   if (!context.mounted) return;
+                  // Pop the loading dialog
+                  Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Error signing out')),
+                    const SnackBar(
+                      content: Text(
+                        'Error signing out',
+                        style: TextStyle(color: Color(0xFFFDFDFD)),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               },

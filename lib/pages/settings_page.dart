@@ -60,22 +60,76 @@ class _SettingsPageState extends State<SettingsPage> {
         });
         if (!mounted) return;
 
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Preferences updated successfully')),
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const Dialog(
+              backgroundColor: Color(0xFF202020),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Color(0xffa91d3a),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Restarting app...',
+                      style: TextStyle(
+                        color: Color(0xFFFDFDFD),
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
 
-        // Navigate back to home page to refresh
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomePage()),
-          (route) => false,
-        );
+        try {
+          // Add a small delay to show the loading dialog
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          if (!mounted) return;
+
+          // Navigate to a fresh instance of HomePage
+          await Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => const HomePage(),
+              settings: const RouteSettings(name: '/home'),
+            ),
+            (route) => false,
+          );
+        } catch (e) {
+          safePrint('Error during navigation: $e');
+          if (!mounted) return;
+          Navigator.of(context).pop(); // Remove loading dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Error restarting app',
+                style: TextStyle(color: Color(0xFFFDFDFD)),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       safePrint('Error updating preferences: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update preferences')),
+        const SnackBar(
+          content: Text(
+            'Failed to update preferences',
+            style: TextStyle(color: Color(0xFFFDFDFD)),
+          ),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }

@@ -150,6 +150,9 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
         initialChildSize: 1.0,
         minChildSize: 0.1,
         maxChildSize: 1.0,
+        snapSizes: const [0.1, 1.0],
+        snap: true,
+        snapAnimationDuration: const Duration(milliseconds: 300),
         builder: (context, scrollController) {
           final isMinimized = _isSheetAttached && _dragController.size < 0.5;
 

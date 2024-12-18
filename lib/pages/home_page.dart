@@ -61,12 +61,17 @@ class _HomePageState extends State<HomePage> {
     _lifecycleObserver = LifecycleEventHandler(_audioPlayer);
     _audioHandler = AudioHandler(_audioPlayer);
     _playlistHandler = PlaylistHandler();
-    _setupAudioPlayer();
-    _setupPlaylistHandler();
-    _checkAmplifyConfig();
-    _fetchRecentSongs();
-    _fetchUserProfile();
-    _playlistHandler.refreshPlaylists();
+
+    // Initialize in order
+    Future.microtask(() async {
+      await _checkAmplifyConfig();
+      await _fetchUserProfile(); // This will get the new file type preference
+      await _fetchRecentSongs();
+      _setupAudioPlayer();
+      _setupPlaylistHandler();
+      _playlistHandler.refreshPlaylists();
+    });
+
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
   }
 
