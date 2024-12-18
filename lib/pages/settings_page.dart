@@ -253,4 +253,11 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    // Clean up any state management resources
+    _currentUser = null;
+    super.dispose();
+  }
 }

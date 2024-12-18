@@ -811,4 +811,10 @@ class _LibraryPageState extends State<LibraryPage> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    // Cancel any active streams or subscriptions
+    super.dispose();
+  }
 }

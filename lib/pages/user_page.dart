@@ -32,6 +32,12 @@ class _UserPageState extends State<UserPage> {
     _fetchUserProfile();
   }
 
+  @override
+  void dispose() {
+    // Add any page-specific cleanup here if needed in the future
+    super.dispose();
+  }
+
   Future<void> _fetchUserProfile() async {
     try {
       final user = await Amplify.Auth.getCurrentUser();
