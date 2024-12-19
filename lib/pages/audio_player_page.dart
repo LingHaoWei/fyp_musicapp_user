@@ -40,10 +40,8 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   Duration _position = Duration.zero;
   final DraggableScrollableController _dragController =
       DraggableScrollableController();
-  bool _isSheetAttached = false;
   late Songs _currentSong;
   String? _cachedAlbumArtUrl;
-  bool _isDragging = false;
   late StreamSubscription _playbackSubscription;
   late StreamSubscription _durationSubscription;
   late StreamSubscription _positionSubscription;
@@ -56,9 +54,15 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     _isPlaying = widget.isPlaying;
     _setupPlayerListeners();
     _loadAlbumArt();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() => _isSheetAttached = true);
-    });
+
+    // Add controller listener
+    _dragController.addListener(_handleDragUpdate);
+  }
+
+  void _handleDragUpdate() {
+    if (_dragController.size <= 0.0) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -111,6 +115,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     _durationSubscription.cancel();
     _positionSubscription.cancel();
     _currentSongSubscription.cancel();
+    _dragController.removeListener(_handleDragUpdate); // Remove listener
     _dragController.dispose();
     super.dispose();
   }
@@ -137,191 +142,63 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return NotificationListener<DraggableScrollableNotification>(
-      onNotification: (notification) {
-        setState(() {
-          _isDragging =
-              notification.extent != 1.0 && notification.extent != 0.1;
-        });
-        return true;
-      },
-      child: DraggableScrollableSheet(
-        controller: _dragController,
-        initialChildSize: 1.0,
-        minChildSize: 0.1,
-        maxChildSize: 1.0,
-        snapSizes: const [0.1, 1.0],
-        snap: true,
-        snapAnimationDuration: const Duration(milliseconds: 300),
-        builder: (context, scrollController) {
-          final isMinimized = _isSheetAttached && _dragController.size < 0.5;
-
-          return Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF2A1A1A),
-                  Color(0xFF151515),
-                ],
-                stops: [0.0, 0.8],
-              ),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(isMinimized ? 0 : 20),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!isMinimized)
-                  Container(
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[600],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    physics: isMinimized
-                        ? const NeverScrollableScrollPhysics()
-                        : const AlwaysScrollableScrollPhysics(),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      child: isMinimized
-                          ? _buildMiniPlayer()
-                          : Column(
-                              key: const ValueKey('full_player'),
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                const SizedBox(height: 48),
-                                if (!_isDragging) _buildAlbumArt(),
-                                const SizedBox(height: 24),
-                                _buildSongInfo(),
-                                const SizedBox(height: 24),
-                                _buildProgressBar(),
-                                const SizedBox(height: 48),
-                                _buildControls(),
-                                const SizedBox(height: 32),
-                              ],
-                            ),
-                    ),
-                  ),
-                ),
+    return DraggableScrollableSheet(
+      controller: _dragController,
+      initialChildSize: 1.0,
+      minChildSize: 0.0,
+      maxChildSize: 1.0,
+      snapSizes: const [0.0, 1.0],
+      snap: true,
+      snapAnimationDuration: const Duration(milliseconds: 300),
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF2A1A1A),
+                Color(0xFF151515),
               ],
+              stops: [0.0, 0.8],
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildMiniPlayer() {
-    return Container(
-      key: const ValueKey('mini_player'),
-      height: 60,
-      color: const Color(0xFF151515),
-      child: Row(
-        children: [
-          // Album art
-          Container(
-            width: 40,
-            height: 40,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            child: Hero(
-              tag: 'album_art_${_currentSong.id}',
-              child: _cachedAlbumArtUrl == null
-                  ? Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey[800],
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Center(child: CircularProgressIndicator()),
-                    )
-                  : _cachedAlbumArtUrl!.isEmpty
-                      ? Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[800],
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(Icons.music_note, size: 20),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: CachedNetworkImage(
-                            key: ValueKey(_cachedAlbumArtUrl),
-                            imageUrl: _cachedAlbumArtUrl!,
-                            fit: BoxFit.cover,
-                            memCacheWidth: 80, // 2x of display size
-                            memCacheHeight: 80,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[800],
-                              child: const Center(
-                                  child: CircularProgressIndicator()),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey[800],
-                              child: const Icon(Icons.error),
-                            ),
-                          ),
-                        ),
-            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          // Song info
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _currentSong.title ?? 'Unknown Title',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  _currentSong.artist ?? 'Unknown Artist',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[400],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          // Controls
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Column(
             children: [
-              IconButton(
-                icon: Icon(
-                  _isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: Colors.white,
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                onPressed: _onPlayPause,
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.skip_next,
-                  color: Colors.white,
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  physics: const ClampingScrollPhysics(),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      const SizedBox(height: 48),
+                      _buildAlbumArt(),
+                      const SizedBox(height: 24),
+                      _buildSongInfo(),
+                      const SizedBox(height: 24),
+                      _buildProgressBar(),
+                      const SizedBox(height: 48),
+                      _buildControls(),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
-                onPressed: () {
-                  // Implement next track
-                },
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -791,7 +668,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     const Color inactiveColor = Color(0xFFFDFDFD);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -801,6 +678,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             builder: (context, snapshot) {
               final isShuffling = snapshot.data ?? false;
               return IconButton(
+                padding: EdgeInsets.zero,
                 iconSize: secondaryButtonSize,
                 icon: Icon(
                   Icons.shuffle,
@@ -812,6 +690,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             },
           ),
           IconButton(
+            padding: EdgeInsets.zero,
             iconSize: sideButtonSize,
             icon: const Icon(
               Icons.skip_previous,
@@ -822,7 +701,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
           Container(
             width: mainButtonSize,
             height: mainButtonSize,
-            margin: const EdgeInsets.symmetric(horizontal: 24),
+            margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: activeColor,
@@ -835,6 +714,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
               ],
             ),
             child: IconButton(
+              padding: EdgeInsets.zero,
               iconSize: mainButtonSize * 0.5,
               icon: Icon(
                 _isLoading
@@ -846,6 +726,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             ),
           ),
           IconButton(
+            padding: EdgeInsets.zero,
             iconSize: sideButtonSize,
             icon: const Icon(
               Icons.skip_next,
@@ -877,6 +758,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
               }
 
               return IconButton(
+                padding: EdgeInsets.zero,
                 iconSize: secondaryButtonSize,
                 icon: Icon(icon, color: color),
                 onPressed: () {
