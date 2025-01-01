@@ -8,13 +8,44 @@ import 'package:fyp_musicapp_aws/pages/home_page.dart';
 import 'package:fyp_musicapp_aws/theme/app_color.dart';
 import 'amplifyconfiguration.dart';
 import 'models/ModelProvider.dart';
+import 'services/audio_handler.dart';
+import 'package:just_audio/just_audio.dart';
+
+Future<void> _configureAmplify() async {
+  try {
+    final auth = AmplifyAuthCognito();
+    final storage = AmplifyStorageS3();
+    final api = AmplifyAPI(
+      options: APIPluginOptions(modelProvider: ModelProvider.instance),
+    );
+    await Amplify.addPlugins([auth, storage, api]);
+    await Amplify.configure(amplifyconfig);
+    safePrint('Successfully configured');
+  } on Exception catch (e) {
+    safePrint('Error configuring Amplify: $e');
+  }
+}
 
 void main() async {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final audioPlayer = AudioPlayer();
+  final audioHandler = AudioHandler(audioPlayer);
+
+  await _configureAmplify();
+
+  runApp(MyApp(
+    audioHandler: audioHandler,
+  ));
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  final AudioHandler audioHandler;
+
+  const MyApp({
+    super.key,
+    required this.audioHandler,
+  });
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -27,34 +58,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _configureAmplify();
-    Amplify.Hub.listen(HubChannel.Auth, (AuthHubEvent event) {
-      if (event.type == AuthHubEventType.signedIn) {
-        _handlePostSignUp(null);
-      }
-    });
-  }
-
-  Future<void> _configureAmplify() async {
-    try {
-      final auth = AmplifyAuthCognito();
-      final storage = AmplifyStorageS3();
-      final api = AmplifyAPI(
-        options: APIPluginOptions(modelProvider: ModelProvider.instance),
-      );
-      await Amplify.addPlugins([auth, storage, api]);
-      await Amplify.configure(amplifyconfig);
-      safePrint('Successfully configured');
-
-      // Check initial auth state
-      await _updateAuthState();
-
-      // Listen for auth events
-      Amplify.Hub.listen(HubChannel.Auth, _onAuthEvent);
-    } on Exception catch (e) {
-      safePrint('Error configuring Amplify: $e');
-    }
-    setState(() => _isLoading = false);
+    _updateAuthState();
+    Amplify.Hub.listen(HubChannel.Auth, _onAuthEvent);
   }
 
   Future<void> _updateAuthState() async {
@@ -74,6 +79,7 @@ class _MyAppState extends State<MyApp> {
       case AuthHubEventType.signedIn:
         safePrint('User is signed in.');
         _updateAuthState();
+        _handlePostSignUp(null);
         break;
       case AuthHubEventType.signedOut:
         safePrint('User is signed out.');

@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 import 'package:fyp_musicapp_aws/pages/audio_player_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fyp_musicapp_aws/pages/voice_recognition_page.dart';
 
 class SearchPage extends StatefulWidget {
   final AudioHandler audioHandler;
@@ -504,8 +505,11 @@ class _SearchPageState extends State<SearchPage> {
                         Icons.search,
                         color: Colors.grey,
                       ),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_searchController.text.isNotEmpty)
+                            IconButton(
                               icon: const Icon(Icons.clear, color: Colors.grey),
                               onPressed: () {
                                 _searchController.clear();
@@ -514,8 +518,25 @@ class _SearchPageState extends State<SearchPage> {
                                   _searchResults.clear();
                                 });
                               },
-                            )
-                          : null,
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.mic, color: Colors.grey),
+                            onPressed: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const VoiceRecognitionPage(),
+                                ),
+                              );
+                              if (result != null) {
+                                _searchController.text = result;
+                                _onSearchChanged(result);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,

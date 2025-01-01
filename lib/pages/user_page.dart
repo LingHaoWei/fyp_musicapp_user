@@ -274,7 +274,11 @@ class _UserPageState extends State<UserPage> {
                   // Pop the loading dialog
                   Navigator.of(context).pop();
                   Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const MyApp()),
+                    MaterialPageRoute(
+                      builder: (context) => MyApp(
+                        audioHandler: widget.audioHandler,
+                      ),
+                    ),
                     (route) => false,
                   );
                 } catch (e) {

@@ -7,13 +7,18 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:just_audio/just_audio.dart';
 import 'package:fyp_musicapp_aws/main.dart';
+import 'package:fyp_musicapp_aws/services/audio_handler.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    final audioPlayer = AudioPlayer();
+    final audioHandler = AudioHandler(audioPlayer);
+
+    await tester.pumpWidget(MyApp(
+      audioHandler: audioHandler,
+    ));
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);

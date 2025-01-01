@@ -142,63 +142,69 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      controller: _dragController,
-      initialChildSize: 1.0,
-      minChildSize: 0.0,
-      maxChildSize: 1.0,
-      snapSizes: const [0.0, 1.0],
-      snap: true,
-      snapAnimationDuration: const Duration(milliseconds: 300),
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF2A1A1A),
-                Color(0xFF151515),
-              ],
-              stops: [0.0, 0.8],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[600],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  physics: const ClampingScrollPhysics(),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      const SizedBox(height: 48),
-                      _buildAlbumArt(),
-                      const SizedBox(height: 24),
-                      _buildSongInfo(),
-                      const SizedBox(height: 24),
-                      _buildProgressBar(),
-                      const SizedBox(height: 48),
-                      _buildControls(),
-                      const SizedBox(height: 32),
+    return Scaffold(
+      body: Stack(
+        children: [
+          DraggableScrollableSheet(
+            controller: _dragController,
+            initialChildSize: 1.0,
+            minChildSize: 0.0,
+            maxChildSize: 1.0,
+            snapSizes: const [0.0, 1.0],
+            snap: true,
+            snapAnimationDuration: const Duration(milliseconds: 300),
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFF2A1A1A),
+                      Color(0xFF151515),
                     ],
+                    stops: [0.0, 0.8],
                   ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-              ),
-            ],
+                child: Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[600],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: scrollController,
+                        physics: const ClampingScrollPhysics(),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            const SizedBox(height: 48),
+                            _buildAlbumArt(),
+                            const SizedBox(height: 24),
+                            _buildSongInfo(),
+                            const SizedBox(height: 24),
+                            _buildProgressBar(),
+                            const SizedBox(height: 48),
+                            _buildControls(),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 

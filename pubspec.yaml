@@ -46,6 +46,7 @@ dependencies:
   speech_to_text: ^6.4.1
   flutter_cache_manager: ^3.4.1
   sliding_up_panel: ^2.0.0+1
+  flutter_acrcloud: ^0.2.2
 
 dev_dependencies:
   flutter_test:

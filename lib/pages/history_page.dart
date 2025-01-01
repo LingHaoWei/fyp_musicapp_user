@@ -167,9 +167,62 @@ class _HistoryPageState extends State<HistoryPage> {
                                           leading: const Icon(Icons.delete),
                                           title:
                                               const Text('Remove from History'),
-                                          onTap: () {
-                                            // Implement delete functionality
-                                            Navigator.pop(context);
+                                          onTap: () async {
+                                            final navigator =
+                                                Navigator.of(context);
+                                            final messenger =
+                                                ScaffoldMessenger.of(context);
+                                            // Close the bottom sheet first
+                                            navigator.pop();
+
+                                            // Remove the history item
+                                            if (history != null) {
+                                              try {
+                                                final request =
+                                                    ModelMutations.delete(
+                                                        history);
+                                                await Amplify.API
+                                                    .mutate(request: request)
+                                                    .response;
+
+                                                // Refresh the history list
+                                                await _fetchHistory();
+
+                                                if (mounted) {
+                                                  messenger.showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                          'Removed from history',
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          )),
+                                                      backgroundColor:
+                                                          Color(0xFF303030),
+                                                    ),
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                safePrint(
+                                                    'Error removing history item: $e');
+                                                if (mounted) {
+                                                  messenger.showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                          'Error removing from history',
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          )),
+                                                      backgroundColor:
+                                                          Colors.red,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            }
                                           },
                                         ),
                                       ],

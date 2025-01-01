@@ -116,7 +116,6 @@ class _HomePageState extends State<HomePage> {
       final request = ModelQueries.list(
         Songs.classType,
         where: Songs.FILETYPE.eq(_preferFileType),
-        limit: 10,
       );
 
       final response = await Amplify.API.query(request: request).response;
@@ -127,13 +126,26 @@ class _HomePageState extends State<HomePage> {
         return <Songs?>[];
       }
 
+      // Convert to non-nullable list for sorting
+      final songs = items.whereType<Songs>().toList();
+
+      // Sort by creation date (newest first)
+      songs.sort((a, b) {
+        final aDate = a.createdAt ?? TemporalDateTime(DateTime(1970));
+        final bDate = b.createdAt ?? TemporalDateTime(DateTime(1970));
+        return bDate.compareTo(aDate); // Reverse order for newest first
+      });
+
+      // Take only the first 10 songs
+      final recentSongs = songs.take(10).toList();
+
       // Debug each song
-      for (final song in items) {
+      for (final song in recentSongs) {
         safePrint(
-            'Song found: ID=${song?.id}, Title=${song?.title}, FileType=${song?.fileType}');
+            'Song found: ID=${song.id}, Title=${song.title}, Created=${song.createdAt}, FileType=${song.fileType}');
       }
 
-      return items;
+      return recentSongs;
     } on ApiException catch (e) {
       safePrint('API Error: ${e.message}');
       return <Songs?>[];

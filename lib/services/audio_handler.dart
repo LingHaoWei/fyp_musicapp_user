@@ -202,4 +202,19 @@ class AudioHandler {
   Future<void> setShuffleMode(bool enabled) async {
     await player.setShuffleModeEnabled(enabled);
   }
+
+  Future<void> playNextSong() async {
+    if (_preloadQueue.isEmpty) return;
+    final nextSong = _preloadQueue.removeFirst();
+    await playSong(nextSong, _preloadQueue.toList());
+  }
+
+  Future<void> playPreviousSong() async {
+    if (_currentSong == null) return;
+    // For now, just restart the current song
+    await seekTo(Duration.zero);
+    await play();
+  }
+
+  bool get playing => player.playing;
 }
